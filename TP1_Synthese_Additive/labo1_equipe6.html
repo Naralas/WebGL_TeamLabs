@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="css/stylesheet.css">
+    <script src="js/commonFunctions.js"></script>
+    <script src="js/gl-matrix-min.js"></script>
+    <script src="js/webglTools.js"></script>
+
+    <!-- Vertex Shader -->
+    <script id="shader-vs" type="x-shader/x-vertex">
+      attribute vec3 aVertexPosition;
+    	uniform mat4 uMVMatrix;
+    	uniform mat4 uPMatrix;
+  		varying vec3 pos;
+
+    	void main(void) {
+  			pos = aVertexPosition;
+        gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+  	  }
+    </script>
+
+    <!-- Fragment Shader -->
+    <script id="shader-fs" type="x-shader/x-fragment">
+      #ifdef GL_ES
+    		precision highp float;
+    	#endif
+      varying vec3 pos;
+
+      // we're using low precision (2^-8) floats for colors and most other stuff because we don't need much precision and it's more portable / faster
+
+      // used to define if synthesis is additive or subtractive (no bool in glsl)
+      uniform lowp float uIsAdditive;
+      // circles radius
+      uniform lowp float uRadius;
+      // 3 coordinates (x;y;z) determining the center of each circle
+      uniform float uCirclesCenter[9];
+      // 3 rgb sets determining each circle's color (alpha is always 1.0)
+      uniform lowp float uCirclesColor[9];
+
+    	void main(void) {
+        // retrieve circles center from the uniform array
+        vec3 center1 = vec3(uCirclesCenter[0], uCirclesCenter[1], uCirclesCenter[2]);
+        vec3 center2 = vec3(uCirclesCenter[3], uCirclesCenter[4], uCirclesCenter[5]);
+  			vec3 center3 = vec3(uCirclesCenter[6], uCirclesCenter[7], uCirclesCenter[8]);
+
+        // retrieve circles color from the uniform array
+        vec3 color1 = vec3(uCirclesColor[0], uCirclesColor[1], uCirclesColor[2]);
+        vec3 color2 = vec3(uCirclesColor[3], uCirclesColor[4], uCirclesColor[5]);
+        vec3 color3 = vec3(uCirclesColor[6], uCirclesColor[7], uCirclesColor[8]);
+
+        // if not using custom circles color (legacy code):
+        /* gl_FragColor = vec4(abs(uIsAdditive - step(uRadius, distance(center1, pos))),
+                               abs(uIsAdditive - step(uRadius, distance(center2, pos))),
+                               abs(uIsAdditive - step(uRadius, distance(center3, pos))),
+                               1.0); */
+
+
+        /*
+        For each circle we determine whether we need to add the color of the circle or not :
+          the built-in method 'step' returns 1.0 if the first parameter (the distance between the center of the circle
+            and the fragment's position in world coordinates) is smaller than the second one (the circle's
+            radius) otherwise returns 0.0
+          -> i.e. if the fragment is inside circle1 the step method will return 1.0 and the circle1's r,g,b components wil be added to the fragment's color
+        we think this is an elegant way and relies on maths instead of conditions which is better for the fragment shader as we leave optimization to the language
+        */
+        vec3 stepCenters = vec3(step(distance(center1, pos), uRadius),
+                                step(distance(center2, pos), uRadius),
+                                step(distance(center3, pos), uRadius));
+
+        /*
+        defining every fragment's color
+        uIsAdditive is 1.0 if it's additive otherwise 0.0 -> if additive:    |(1.0 - 1.0) - r|    ->    |-r|     =    0.0 + r
+                                                             if subtractive: |(1.0 - 0.0) - r|    ->   |1.0 - r| =    1.0 - r
+        and we multiply circles rgb components by 1.0 or 0.0 if the point is inside the associated circle (as previously explained)
+        */
+        float r = abs((1.0-uIsAdditive) - (stepCenters.x * color1.x +
+                                           stepCenters.y * color2.x +
+                                           stepCenters.z * color3.x));
+        float g = abs((1.0-uIsAdditive) - (stepCenters.x * color1.y +
+                                           stepCenters.y * color2.y +
+                                           stepCenters.z * color3.y));
+        float b = abs((1.0-uIsAdditive) - (stepCenters.x * color1.z +
+                                           stepCenters.y * color2.z +
+                                           stepCenters.z * color3.z));
+
+        // define fragment's color
+        gl_FragColor = vec4(r, g, b, 1.0);
+    	}
+    </script>
+
+    <script>
+      // buffers
+      var vertexBuffer = null;
+      var indexBuffer = null;
+
+      // scene geometry
+      var indices = [];
+      var vertices = [];
+
+      // camera
+      var mvMatrix = mat4.create();
+      var pMatrix = mat4.create();
+
+      var isAdditive = true;
+
+      // circles parameters
+      const radius = 0.5;
+      const distToOrigin = 0.30;
+
+      // default circles position is at the 3 vertices of an equilateral triangle
+      const defaultCirclesCenter = [distToOrigin * Math.cos(Math.PI/6), -distToOrigin * Math.sin(Math.PI/6), 0.0,
+                                    0.0, distToOrigin, 0.0,
+                                    -distToOrigin * Math.cos(Math.PI/6), -distToOrigin * Math.sin(Math.PI/6), 0.0];
+      var circlesCenter = defaultCirclesCenter.slice(0);
+
+      const defaultCirclesColor = [1.0, 0.0, 0.0,
+                                   0.0, 1.0, 0.0,
+                                   0.0, 0.0, 1.0];
+      var circlesColor = defaultCirclesColor.slice(0);
+
+      // circles center translations variables
+      var isMouseDown = false;
+      var selectedCircles = [];
+      var lastMousePos = null;
+
+      // creates the "bridges" between JS and the GLSL program (shaders) "prg"
+      function initShaderParameters(prg) {
+        prg.vertexPositionAttribute = glContext.getAttribLocation(prg, "aVertexPosition");
+        glContext.enableVertexAttribArray(prg.vertexPositionAttribute);
+
+        prg.pMatrixUniform = glContext.getUniformLocation(prg, 'uPMatrix');
+        prg.mvMatrixUniform = glContext.getUniformLocation(prg, 'uMVMatrix');
+
+        prg.isAdditive = glContext.getUniformLocation(prg, "uIsAdditive");
+        prg.radiusUniform = glContext.getUniformLocation(prg, "uRadius");
+
+        prg.circlesCenter = glContext.getUniformLocation(prg, "uCirclesCenter");
+        prg.circlesColor = glContext.getUniformLocation(prg, "uCirclesColor");
+      }
+
+      // buffers initialization to send vertices and index data to the shaders
+      function initBuffers() {
+        // simple full screen square formed of two triangles
+        let sceneWidth = 2;
+        let sceneLeft = -1;
+        vertices.push(sceneLeft, sceneLeft + sceneWidth, 0.0);
+        vertices.push(sceneLeft, sceneLeft, 0.0);
+        vertices.push(sceneLeft + sceneWidth, sceneLeft, 0.0);
+        vertices.push(sceneLeft + sceneWidth, sceneLeft + sceneWidth, 0.0);
+        indices.push(0, 1, 2, 0, 2, 3);
+
+        vertexBuffer = getVertexBufferWithVertices(vertices);
+        indexBuffer = getIndexBufferWithIndices(indices);
+      }
+
+      // draws and initializes the scene
+      function drawScene() {
+        // scene initialization
+        glContext.clearColor(0.9, 0.9, 0.9, 1.0);
+        glContext.enable(glContext.DEPTH_TEST);
+        glContext.clear(glContext.COLOR_BUFFER_BIT | glContext.DEPTH_BUFFER_BIT);
+        glContext.viewport(0, 0, c_width, c_height);
+
+        // camera matrices initialization
+        mat4.identity(pMatrix);
+        mat4.identity(mvMatrix);
+
+        // camera matrices data conversion to be compatible with shaders and binding with shader program's variables
+        glContext.uniformMatrix4fv(prg.pMatrixUniform, false, pMatrix);
+        glContext.uniformMatrix4fv(prg.mvMatrixUniform, false, mvMatrix);
+
+        // float variables conversion to shader format and binding with shader program's variables
+        glContext.uniform1f(prg.isAdditive, isAdditive); // cast boolean to float -> 1.0 if true else 0.0
+        glContext.uniform1f(prg.radiusUniform, radius);
+
+        // float arrays conversion to shader format and binding with shader program's variables
+        glContext.uniform1fv(prg.circlesCenter, circlesCenter);
+        glContext.uniform1fv(prg.circlesColor, circlesColor);
+
+        // vertices and index arrays conversion and binding to shader variables
+        glContext.bindBuffer(glContext.ARRAY_BUFFER, vertexBuffer);
+        glContext.vertexAttribPointer(prg.vertexPositionAttribute, 3, glContext.FLOAT, false, 0, 0);
+
+        glContext.bindBuffer(glContext.ELEMENT_ARRAY_BUFFER, indexBuffer);
+        glContext.drawElements(glContext.TRIANGLES, indices.length, glContext.UNSIGNED_SHORT,0);
+      }
+
+      // initializes the webgl program
+      function initWebGL() {
+        glContext = getGLContext('webgl-canvas');
+        initProgram();
+        initBuffers();
+        renderLoop();
+      }
+
+      // toggles the synthesis mode
+      function toggleAdditive() {
+        isAdditive = !isAdditive;
+      }
+
+      // resets the circles center
+      function resetCirclesCenter() {
+        circlesCenter = defaultCirclesCenter.slice(0);
+      }
+
+      // resets the circles color
+      function resetCirclesColor() {
+        circlesColor = defaultCirclesColor.slice(0);
+
+        // reset color pickers value
+        document.getElementById("color1").value = rgbToHex(defaultCirclesColor[0], defaultCirclesColor[1], defaultCirclesColor[2]);
+        document.getElementById("color2").value = rgbToHex(defaultCirclesColor[3], defaultCirclesColor[4], defaultCirclesColor[5]);
+        document.getElementById("color3").value = rgbToHex(defaultCirclesColor[6], defaultCirclesColor[7], defaultCirclesColor[8]);
+      }
+
+      // changes a circle's color
+      function changeColor(offset, newHexColor) {
+        // offset is used to change colors on the right circle (0-2;3-5;6-8) because colors are stored like [r,g,b,r,g,b,r,g,b]
+        let newRGBColor = hexToRgb(newHexColor);
+        circlesColor[offset + 0] = newRGBColor.r;
+        circlesColor[offset + 1] = newRGBColor.g;
+        circlesColor[offset + 2] = newRGBColor.b;
+      }
+
+      // maps a value which varies between 'from1' and 'to1' to new limits 'from2' and 'to2'
+      function mapValue(value, from1, to1, from2, to2) {
+        return ((value-from1) / (to1-from1)) * (to2-from2) + from2;
+      }
+
+      // returns the hex components of the given RGB color
+      function rgbToHex(r, g, b) {
+        // source : https://stackoverflow.com/questions/5623838/rgb-to-hex-and-hex-to-rgb
+        return "#" + ((1 << 24) + (mapValue(r, 0, 1, 0, 255) << 16) + (mapValue(g, 0, 1, 0, 255) << 8) + mapValue(b, 0, 1, 0, 255)).toString(16).slice(1);
+      }
+
+      // returns the RGB components of the given hex color
+      function hexToRgb(hex) {
+        // source : https://stackoverflow.com/questions/5623838/rgb-to-hex-and-hex-to-rgb
+        var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+            r: mapValue(parseInt(result[1], 16), 0, 255, 0, 1),
+            g: mapValue(parseInt(result[2], 16), 0, 255, 0, 1),
+            b: mapValue(parseInt(result[3], 16), 0, 255, 0, 1)
+        } : null;
+      }
+
+      // handles a mouse click event
+      function mouseClicked(evt) {
+        isMouseDown = true;
+        lastMousePos = getMousePosInWebgl(evt);
+        selectCircles(lastMousePos);
+      }
+
+      // select circles to be moved
+      function selectCircles(pos) {
+        let center1 = {x: circlesCenter[0], y: circlesCenter[1]};
+        let center2 = {x: circlesCenter[3], y: circlesCenter[4]};
+        let center3 = {x: circlesCenter[6], y: circlesCenter[7]};
+
+        if(distanceBetweenPoints2D(pos, center1) <= radius)
+          selectedCircles.push(0);
+        if(distanceBetweenPoints2D(pos, center2) <= radius)
+          selectedCircles.push(1);
+        if(distanceBetweenPoints2D(pos, center3) <= radius)
+          selectedCircles.push(2);
+      }
+
+      // applies the movement of the mouse to the selected circles
+      function mouseMoved(evt) {
+        if(isMouseDown) {
+          let newMousePos = getMousePosInWebgl(evt);
+
+          let translateVector = {x: newMousePos.x - lastMousePos.x, y: newMousePos.y - lastMousePos.y};
+
+          for(let i=0; i<selectedCircles.length; i++) {
+            let index = selectedCircles[i] * 3;
+            circlesCenter[index + 0] += translateVector.x;
+            circlesCenter[index + 1] += translateVector.y;
+          }
+
+          lastMousePos = newMousePos;
+        }
+      }
+
+      // returns the mouse's position in webgl world coordinates
+      function getMousePosInWebgl(evt) {
+        // bind mouse pos from window to canvas
+        let posInCanvas = {x: evt.offsetX,
+                           y: evt.offsetY};
+
+        // bind mouse pos from canvas to webgl world coordinates
+        return posInWebgl = {x: ((posInCanvas.x/c_width) * 2) - 1,
+                             y: -(((posInCanvas.y/c_height) * 2) - 1)};
+      }
+
+      // returns the distance between the two given points (in 2D)
+      function distanceBetweenPoints2D(p1, p2) {
+        return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+      }
+
+    </script>
+  </head>
+  <body onload="initWebGL()">
+    <header>
+        <h1>&nbsp;Infographie, Labo 1 - Synthèse additive des couleurs<br></h1>
+        <br>&nbsp;&nbsp;Équipe 6 : Chacun Guillaume, Graells Noah, Herbelin Ludovic<br>
+        <br>&nbsp;&nbsp;rendu le 23.10.18
+    </header>
+    <p>
+      Le but du laboratoire était de réaliser une visualisation des cercles de la synthèse additive des couleurs avec 2 triangles seulement.
+      Nous avons décidé de rajouter les fonctionnalités ci-dessous pour étoffer un peu le cahier des charges ainsi que pour ajouter des interactions avec l'utilisateur.
+      <ul>
+        <li>Changer la couleur de chaque cercle</li>
+        <li>Switch entre la synthèse additive et soustractive </li>
+        <li>Déplacer le centre de chaque cercle</li>
+      </ul>
+    </p>
+    <canvas id="webgl-canvas" width="500" height="500">
+      HTML5 is not supported
+    </canvas>
+
+    <div id="control-panel">
+      <div class="user-input">
+        <p>Sélectionner une couleur personnalisée pour chaque cercle :</p>
+        <input type="color" id="color1" onchange="changeColor(0, this.value)" />
+        <input type="color" id="color2" onchange="changeColor(3, this.value)" />
+        <input type="color" id="color3" onchange="changeColor(6, this.value)" />
+        <input type="button" value="Réinitialiser la couleur des cercles" onclick="resetCirclesColor()" />
+      </div>
+
+      <br/>
+      <div class="user-input">
+        <p>Sélectionner le mode de synthèse :</p>
+        <label for="additive"><input type="radio" name="isAdditive" id="additive" onclick="toggleAdditive()" checked>Additive</label><br/>
+        <label for="subtractive"><input type="radio" name="isAdditive" id="subtractive" onclick="toggleAdditive()">Soustractive <b style="font-size: 14px">les couleurs sont inversées (y.c. les couleurs personnalisées) !</b></label>
+      </div>
+
+      <br/>
+      <div class="user-input">
+        <p>Bouger un ou plusieurs cercles en gardant le clic gauche appuyé dessus et en déplaçant la souris</p>
+        <input type="button" value="Réinitialiser la position des cercles" onclick="resetCirclesCenter()" />
+      </div>
+    </div>
+
+    <script>
+      // init canvas listeners
+      var canvas = document.getElementById("webgl-canvas");
+      canvas.addEventListener("mousedown", mouseClicked);
+      canvas.addEventListener("mouseup", evt => {
+        selectedCircles = [];
+        isMouseDown = false;
+        lastMousePos = null;
+      });
+      canvas.addEventListener("mousemove", mouseMoved);
+
+      // set default color pickers value
+      resetCirclesColor();
+    </script>
+  </body>
+</html>
