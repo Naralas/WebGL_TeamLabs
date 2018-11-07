@@ -41,6 +41,8 @@
       var mvMatrix = mat4.create();
       var pMatrix = mat4.create();
 
+      var cameraPos = [0.0, 0.0, -3.0];
+
       function initShaderParameters(prg) {
         prg.vertexPositionAttribute = glContext.getAttribLocation(prg, "aVertexPosition");
         glContext.enableVertexAttribArray(prg.vertexPositionAttribute);
@@ -53,10 +55,39 @@
       }
 
       function initBuffers() {
-        // todo ...
-        // vertices.push();
-        // colors.push();
-        // indices.push();
+        let width = 3.0;
+        let c = {x: 5.0, y: 5.0, z: 0.0};
+        vertices.push(c.x - width/2, c.y - width/2, c.z + width/2,  // P0
+                      c.x + width/2, c.y - width/2, c.z + width/2,  // P1
+                      c.x - width/2, c.y + width/2, c.z + width/2,  // P2
+                      c.x + width/2, c.y + width/2, c.z + width/2,  // P3
+                      c.x + width/2, c.y + width/2, c.z - width/2,  // P4
+                      c.x + width/2, c.y - width/2, c.z + width/2,  // P5
+                      c.x + width/2, c.y - width/2, c.z - width/2,  // P6
+                      c.x - width/2, c.y - width/2, c.z + width/2,  // P7
+                      c.x - width/2, c.y - width/2, c.z - width/2,  // P8
+                      c.x - width/2, c.y + width/2, c.z + width/2,  // P9
+                      c.x - width/2, c.y + width/2, c.z - width/2,  // P10
+                      c.x + width/2, c.y + width/2, c.z - width/2,  // P11
+                      c.x - width/2, c.y - width/2, c.z - width/2,  // P12
+                      c.x + width/2, c.y - width/2, c.z - width/2   // P13
+                    );
+        indices.push(0,1,2,3,4,5,6,7,8,9,10,11,12,13);
+        colors.push(1.0, 1.0, 1.0, 1.0, // P0
+                    1.0, 1.0, 1.0, 1.0, // P1
+                    1.0, 1.0, 1.0, 1.0, // P2
+                    1.0, 1.0, 1.0, 1.0, // P3
+                    0.0, 0.0, 0.0, 1.0, // P4
+                    0.0, 0.0, 0.0, 1.0, // P5
+                    0.0, 0.0, 0.0, 1.0, // P6
+                    0.0, 0.0, 0.0, 1.0, // P7
+                    0.0, 0.0, 0.0, 1.0, // P8
+                    0.0, 0.0, 0.0, 1.0, // P9
+                    1.0, 1.0, 1.0, 1.0, // P10
+                    1.0, 1.0, 1.0, 1.0, // P11
+                    1.0, 1.0, 1.0, 1.0, // P12
+                    1.0, 1.0, 1.0, 1.0  // P13
+                  );
 
         vertexBuffer = getVertexBufferWithVertices(vertices);
         colorBuffer = getVertexBufferWithVertices(colors);
@@ -64,7 +95,6 @@
       }
 
       function drawScene() {
-        // todo ...
         glContext.clearColor(0.9, 0.9, 0.9, 1.0);
         glContext.enable(glContext.DEPTH_TEST);
         glContext.clear(glContext.COLOR_BUFFER_BIT | glContext.DEPTH_BUFFER_BIT);
@@ -72,6 +102,11 @@
 
         mat4.identity(pMatrix);
         mat4.identity(mvMatrix);
+
+        // mat4.rotate(mvMatrix, mvMatrix, degToRad(10), [0.0, 1.0, 0.0]);
+        // mat4.rotate(mvMatrix, mvMatrix, degToRad(10), [0.0, 0.0, 1.0]);
+        mat4.translate(mvMatrix, mvMatrix, cameraPos);
+        mat4.perspective(pMatrix, 60, c_width/c_height, 0.1, 1000.0);
 
         glContext.uniformMatrix4fv(prg.pMatrixUniform, false, pMatrix);
         glContext.uniformMatrix4fv(prg.mvMatrixUniform, false, mvMatrix);
