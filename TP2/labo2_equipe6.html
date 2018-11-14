@@ -7,6 +7,10 @@
     <script src="./js/gl-matrix-min.js"></script>
     <script src="./js/webglTools.js"></script>
 
+    <script src="./SolidShape.js"></script>
+    <script src="./Cube.js"></script>
+    <script src="./Tetrahedron.js"></script>
+
     <script id="shader-vs" type="x-shader/x-vertex">
       attribute vec3 aVertexPosition;
     	attribute vec4 aColor;
@@ -40,6 +44,7 @@
 
       var mvMatrix = mat4.create();
       var pMatrix = mat4.create();
+      var t,c = null;
 
       var cameraPos = [0.0, 0.0, -2.0];
 
@@ -50,63 +55,25 @@
         prg.colorAttribute = glContext.getAttribLocation(prg, "aColor");
         glContext.enableVertexAttribArray(prg.colorAttribute);
 
-        prg.pMatrixUniform = glContext.getUniformLocation(prg, 'uPMatrix');
-        prg.mvMatrixUniform = glContext.getUniformLocation(prg, 'uMVMatrix');
+        prg.pMatrixUniform = glContext.getUniformLocation(prg, "uPMatrix");
+        prg.mvMatrixUniform = glContext.getUniformLocation(prg, "uMVMatrix");
       }
 
       function initBuffers() {
-        addCube();
-        // addTetrahedron();
+        c = new Cube(vertices, indices, colors,
+                         .2,
+                         {x: -.5, y: -.5, z: .0},
+                         {r: 1.0, g: 0.6, b: 1.0, a: 1.0}
+                       );
+        t = new Tetrahedron(vertices, indices, colors,
+                                .4,
+                                {x: .75, y: .75, z: -.2},
+                                {r: 0.6, g: 1.0, b: 1.0, a: 1.0}
+                              );
 
         vertexBuffer = getVertexBufferWithVertices(vertices);
         colorBuffer = getVertexBufferWithVertices(colors);
         indexBuffer = getIndexBufferWithIndices(indices);
-      }
-
-      function addCube() {
-        let width = .2;
-        let c = {x: -.5, y: -.5, z: 0.0};
-        vertices.push(c.x - width/2, c.y - width/2, c.z + width/2,  // P0
-                      c.x + width/2, c.y - width/2, c.z + width/2,  // P1
-                      c.x - width/2, c.y + width/2, c.z + width/2,  // P2
-                      c.x + width/2, c.y + width/2, c.z + width/2,  // P3
-                      c.x + width/2, c.y + width/2, c.z - width/2,  // P4
-                      c.x + width/2, c.y - width/2, c.z - width/2,  // P5
-                      c.x - width/2, c.y - width/2, c.z - width/2,  // P6
-                      c.x - width/2, c.y + width/2, c.z - width/2,  // P7
-                    );
-        indices.push(0,1,2,3,4,1,5,0,6,2,7,4,6,5);
-        colors.push(1.0, 1.0, 1.0, 1.0, // P0
-                    1.0, 1.0, 1.0, 1.0, // P1
-                    1.0, 1.0, 1.0, 1.0, // P2
-                    1.0, 1.0, 1.0, 1.0, // P3
-                    0.0, 0.0, 0.0, 1.0, // P4
-                    0.0, 0.0, 0.0, 1.0, // P5
-                    0.0, 0.0, 0.0, 1.0, // P6
-                    0.0, 0.0, 0.0, 1.0, // P7
-                    0.0, 0.0, 0.0, 1.0, // P8
-                    0.0, 0.0, 0.0, 1.0, // P9
-                    1.0, 1.0, 1.0, 1.0, // P10
-                    1.0, 1.0, 1.0, 1.0, // P11
-                    1.0, 1.0, 1.0, 1.0, // P12
-                    1.0, 1.0, 1.0, 1.0  // P13
-                  );
-      }
-
-      function addTetrahedron() {
-        let width = .4;
-        let c = {x: .75, y: .75, z: -0.2};
-        vertices.push(c.x - (width/2), c.y - (width/2), c.z - (width/2),  // P0
-                      c.x - (width/2), c.y - (width/2), c.z + (width/2),  // P1
-                      c.x + (width/2), c.y - (width/2), c.z - (width/2),  // P2
-                      c.x, c.y + (width/2), c.z                           // P3
-                    );
-        indices.push(0,1,2,3,0,1);
-        colors.push(1.0, 0.0, 0.0, 1.0, // P0
-                    0.0, 1.0, 0.0, 1.0, // P1
-                    0.0, 0.0, 1.0, 1.0, // P2
-                    0.0, 0.0, 0.0, 1.0, // P3
-                  );
       }
 
       function drawScene() {
@@ -139,7 +106,7 @@
         glContext.vertexAttribPointer(prg.colorAttribute, 4, glContext.FLOAT, false, 0, 0);
 
         glContext.bindBuffer(glContext.ELEMENT_ARRAY_BUFFER, indexBuffer);
-        glContext.drawElements(glContext.TRIANGLE_STRIP, indices.length, glContext.UNSIGNED_SHORT,0);
+        glContext.drawElements(glContext.TRIANGLES, indices.length, glContext.UNSIGNED_SHORT,0);
       }
 
       function initWebGL() {
@@ -147,6 +114,11 @@
         initProgram();
         initBuffers();
         renderLoop();
+      }
+
+      function moveElement(solidShape, newCenter) {
+        solidShape.move(newCenter);
+        vertexBuffer = getVertexBufferWithVertices(vertices);
       }
     </script>
   </head>
