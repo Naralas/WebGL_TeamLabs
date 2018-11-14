@@ -41,7 +41,7 @@
       var mvMatrix = mat4.create();
       var pMatrix = mat4.create();
 
-      var cameraPos = [0.0, 0.0, -3.0];
+      var cameraPos = [0.0, 0.0, -2.0];
 
       function initShaderParameters(prg) {
         prg.vertexPositionAttribute = glContext.getAttribLocation(prg, "aVertexPosition");
@@ -55,8 +55,17 @@
       }
 
       function initBuffers() {
-        let width = 3.0;
-        let c = {x: 5.0, y: 5.0, z: 0.0};
+        addCube();
+        // addTetrahedron();
+
+        vertexBuffer = getVertexBufferWithVertices(vertices);
+        colorBuffer = getVertexBufferWithVertices(colors);
+        indexBuffer = getIndexBufferWithIndices(indices);
+      }
+
+      function addCube() {
+        let width = .2;
+        let c = {x: -.5, y: -.5, z: 0.0};
         vertices.push(c.x - width/2, c.y - width/2, c.z + width/2,  // P0
                       c.x + width/2, c.y - width/2, c.z + width/2,  // P1
                       c.x - width/2, c.y + width/2, c.z + width/2,  // P2
@@ -88,10 +97,22 @@
                     1.0, 1.0, 1.0, 1.0, // P12
                     1.0, 1.0, 1.0, 1.0  // P13
                   );
+      }
 
-        vertexBuffer = getVertexBufferWithVertices(vertices);
-        colorBuffer = getVertexBufferWithVertices(colors);
-        indexBuffer = getIndexBufferWithIndices(indices);
+      function addTetrahedron() {
+        let width = .4;
+        let c = {x: .75, y: .75, z: -0.2};
+        vertices.push(c.x - (width/2), c.y - (width/2), c.z - (width/2),  // P0
+                      c.x - (width/2), c.y - (width/2), c.z + (width/2),  // P1
+                      c.x + (width/2), c.y - (width/2), c.z - (width/2),  // P2
+                      c.x, c.y + (width/2), c.z                           // P3
+                    );
+        indices.push(0,1,2,3,0,1);
+        colors.push(1.0, 0.0, 0.0, 1.0, // P0
+                    0.0, 1.0, 0.0, 1.0, // P1
+                    0.0, 0.0, 1.0, 1.0, // P2
+                    0.0, 0.0, 0.0, 1.0, // P3
+                  );
       }
 
       function drawScene() {
@@ -106,7 +127,13 @@
         // mat4.rotate(mvMatrix, mvMatrix, degToRad(10), [0.0, 1.0, 0.0]);
         // mat4.rotate(mvMatrix, mvMatrix, degToRad(10), [0.0, 0.0, 1.0]);
         mat4.translate(mvMatrix, mvMatrix, cameraPos);
-        mat4.perspective(pMatrix, 60, c_width/c_height, 0.1, 1000.0);
+
+        const fieldOfView = 45 * Math.PI / 180;   // in radians
+        const aspect = glContext.canvas.clientWidth / glContext.canvas.clientHeight;
+        const zNear = 0.1;
+        const zFar = 100.0;
+
+        mat4.perspective(pMatrix, fieldOfView, aspect, zNear, zFar);
 
         glContext.uniformMatrix4fv(prg.pMatrixUniform, false, pMatrix);
         glContext.uniformMatrix4fv(prg.mvMatrixUniform, false, mvMatrix);
