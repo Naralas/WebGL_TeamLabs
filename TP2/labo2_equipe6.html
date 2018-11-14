@@ -71,17 +71,11 @@
                       c.x - width/2, c.y + width/2, c.z + width/2,  // P2
                       c.x + width/2, c.y + width/2, c.z + width/2,  // P3
                       c.x + width/2, c.y + width/2, c.z - width/2,  // P4
-                      c.x + width/2, c.y - width/2, c.z + width/2,  // P5
-                      c.x + width/2, c.y - width/2, c.z - width/2,  // P6
-                      c.x - width/2, c.y - width/2, c.z + width/2,  // P7
-                      c.x - width/2, c.y - width/2, c.z - width/2,  // P8
-                      c.x - width/2, c.y + width/2, c.z + width/2,  // P9
-                      c.x - width/2, c.y + width/2, c.z - width/2,  // P10
-                      c.x + width/2, c.y + width/2, c.z - width/2,  // P11
-                      c.x - width/2, c.y - width/2, c.z - width/2,  // P12
-                      c.x + width/2, c.y - width/2, c.z - width/2   // P13
+                      c.x + width/2, c.y - width/2, c.z - width/2,  // P5
+                      c.x - width/2, c.y - width/2, c.z - width/2,  // P6
+                      c.x - width/2, c.y + width/2, c.z - width/2,  // P7
                     );
-        indices.push(0,1,2,3,4,5,6,7,8,9,10,11,12,13);
+        indices.push(0,1,2,3,4,1,5,0,6,2,7,4,6,5);
         colors.push(1.0, 1.0, 1.0, 1.0, // P0
                     1.0, 1.0, 1.0, 1.0, // P1
                     1.0, 1.0, 1.0, 1.0, // P2
@@ -128,7 +122,7 @@
         // mat4.rotate(mvMatrix, mvMatrix, degToRad(10), [0.0, 0.0, 1.0]);
         mat4.translate(mvMatrix, mvMatrix, cameraPos);
 
-        const fieldOfView = 45 * Math.PI / 180;   // in radians
+        const fieldOfView = degToRad(45);
         const aspect = glContext.canvas.clientWidth / glContext.canvas.clientHeight;
         const zNear = 0.1;
         const zFar = 100.0;
