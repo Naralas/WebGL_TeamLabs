@@ -127,6 +127,11 @@
         solidShape.move(newCenter);
         vertexBuffer = getVertexBufferWithVertices(vertices);
       }
+
+      function rotateElement(solidShape, angle, xAxis=true, yAxis=true, zAxis=true) {
+        solidShape.rotate(angle, xAxis, yAxis, zAxis);
+        vertexBuffer = getVertexBufferWithVertices(vertices);
+      }
     </script>
   </head>
   <body onload="initWebGL()">
