@@ -21,23 +21,39 @@ class SolidShape {
   setColors() { throw new Error("This method must be implemented by derived classes."); }
 
   move(newCenter) {
+    let oldCenter = this.center;
     this.center = newCenter;
-    this.setVertices();
+
+    // compute translation vector
+    let translatationVec = {x: newCenter.x - oldCenter.x,
+                            y: newCenter.y - oldCenter.y,
+                            z: newCenter.z - oldCenter.z};
+
+    // translate each vertex (in place)
+    for (let i=this.verticesOffset; i<this.verticesOffset+(this.numberVertices*3); i+=3) {
+      this.vertices[i+0] += translatationVec.x;
+      this.vertices[i+1] += translatationVec.y;
+      this.vertices[i+2] += translatationVec.z;
+    }
   }
 
   rotate(angle, xAxis=true, yAxis=true, zAxis=true) {
-    let myVertices = this.vertices.slice(this.verticesOffset, this.numberVertices*3);
+    // translate the solid to origin
+    let oldCenter = this.center;
+    this.move({x:0.0, y:0.0, z:0.0});
+
+    // retrieve solid's vertices
+    let oldVertices = this.vertices.slice(this.verticesOffset, this.verticesOffset+(this.numberVertices*3));
     let newVertices = [];
 
     // for each group of 3 values (forming a vertex)
-    for (let i=0; i<myVertices.length; i+=3) {
+    for (let i=0; i<oldVertices.length; i+=3) {
       // init vec4 vertex coords
-      let vertex = vec4.fromValues(myVertices[i+0], myVertices[i+1], myVertices[i+2], 1.0);
+      let vertex = vec4.fromValues(oldVertices[i+0], oldVertices[i+1], oldVertices[i+2], 1.0);
 
       // create an identity mat4
       let viewMatrix = mat4.create();
       mat4.identity(viewMatrix);
-      // mat4.translate(viewMatrix, viewMatrix, [this.center.x,this.center.y,this.center.z]);
 
       // rotate the mat4 according to the given angle and axis
       if(xAxis) mat4.rotate(viewMatrix, viewMatrix, degToRad(angle), [1.0, 0.0, 0.0]);
@@ -51,7 +67,8 @@ class SolidShape {
       newVertices.push(vertex[0], vertex[1], vertex[2]);
     }
 
-    // replace the old vertices by the new ones
+    // replace the old vertices by the new ones and move the solid back to its original position
     this.vertices.splice.apply(this.vertices, [this.verticesOffset, this.numberVertices*3].concat(newVertices));
+    this.move(oldCenter);
   }
 }

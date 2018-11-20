@@ -4,12 +4,12 @@ class Tetrahedron extends SolidShape {
 
     this.width = width;
 
-    this.setVertices(false);
+    this.setVertices();
     this.setIndices();
     this.setColors();
   }
 
-  setVertices(hasBeenInitialized=true) {
+  setVertices(hasBeenInitialized=false) {
     this.vertices.splice(this.verticesOffset, // index
                          hasBeenInitialized ? this.numberVertices*3 : 0, // number of elements to remove before pushing
                          this.center.x - (this.width/2), this.center.y - (this.width/2), this.center.z - (this.width/2),  // P0
