@@ -1,19 +1,35 @@
 class SolidShape {
-  constructor(vertices, indices, colors, center, color, numberVertices) {
+  constructor(vertices, indices, colors, center, color, numberVertices, numberIndices) {
     this.vertices = vertices;
     this.indices = indices;
     this.colors = colors;
 
     this.verticesOffset = this.vertices.length;
-    this.indicesOffset = this.vertices.length/3;
-    this.colorsOffset = this.colors;
+    this.indicesOffset = this.indices.length;
+    this.colorsOffset = this.colors.length;
     this.numberVertices = numberVertices;
+    this.numberIndices = numberIndices;
 
     this.center = center;
+    this.speed = 1;
+    this.lastPathPoint = 0;
     this.color = color;
 
     if (new.target === SolidShape)
       throw new TypeError("Cannot construct SolidShape instances directly.");
+  }
+
+  delete() {
+    this.vertices.splice(this.verticesOffset, this.numberVertices*3);
+    this.indices.splice(this.indicesOffset, this.numberIndices);
+    this.colors.splice(this.colorsOffset, this.numberVertices*4);
+  }
+
+  updateOffsets(deltaVertices, deltaIndices, deltaColors) {
+    this.verticesOffset -= deltaVertices;
+    this.indicesOffset -= deltaIndices;
+    this.colorsOffset -= deltaColors;
+    this.setIndices(true);
   }
 
   setVertices() { throw new Error("This method must be implemented by derived classes."); }

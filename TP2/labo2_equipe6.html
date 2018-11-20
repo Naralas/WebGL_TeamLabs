@@ -37,7 +37,6 @@
       var vertexBuffer = null;
       var indexBuffer = null;
       var colorBuffer = null;
-
       var indices = [];
       var vertices = [];
       var colors = [];
@@ -46,7 +45,13 @@
       var pMatrix = mat4.create();
       var solidShapes = [];
 
-      var cameraPos = [0.0, 0.0, -2.0];
+      var cameraPos = [0.0, 0.0, -3.0];
+
+      var path = [];
+      initPath(10);
+
+      var lastTime = performance.now();
+      const SAME_POINT_DETECTION_ERROR = 0.01;
 
       function initShaderParameters(prg) {
         prg.vertexPositionAttribute = glContext.getAttribLocation(prg, "aVertexPosition");
@@ -66,6 +71,14 @@
       }
 
       function drawScene() {
+        // for each solid shape, rotate and move it as long as its on the path
+        for (let i=solidShapes.length-1; i>=0; i--) {
+          rotateElement(solidShapes[i], 1, true, true, true); // rotate 1 degree on each axis
+          moveAlongPath(solidShapes[i], performance.now() - lastTime, i);
+        }
+        lastTime = performance.now();
+
+
         glContext.clearColor(0.9, 0.9, 0.9, 1.0);
         glContext.enable(glContext.DEPTH_TEST);
         glContext.clear(glContext.COLOR_BUFFER_BIT | glContext.DEPTH_BUFFER_BIT);
@@ -74,15 +87,13 @@
         mat4.identity(pMatrix);
         mat4.identity(mvMatrix);
 
-        // mat4.rotate(mvMatrix, mvMatrix, degToRad(10), [0.0, 1.0, 0.0]);
-        // mat4.rotate(mvMatrix, mvMatrix, degToRad(10), [0.0, 0.0, 1.0]);
         mat4.translate(mvMatrix, mvMatrix, cameraPos);
 
+        // sets the perspective
         const fieldOfView = degToRad(45);
         const aspect = glContext.canvas.clientWidth / glContext.canvas.clientHeight;
         const zNear = 0.1;
         const zFar = 100.0;
-
         mat4.perspective(pMatrix, fieldOfView, aspect, zNear, zFar);
 
         glContext.uniformMatrix4fv(prg.pMatrixUniform, false, pMatrix);
@@ -95,7 +106,8 @@
         glContext.vertexAttribPointer(prg.colorAttribute, 4, glContext.FLOAT, false, 0, 0);
 
         glContext.bindBuffer(glContext.ELEMENT_ARRAY_BUFFER, indexBuffer);
-        glContext.drawElements(glContext.TRIANGLES, indices.length, glContext.UNSIGNED_SHORT,0);
+        glContext.drawElements(glContext.TRIANGLES, indices.length, glContext.UNSIGNED_SHORT, 0);
+        // glContext.drawElements(glContext.LINE_STRIP, indices.length, glContext.UNSIGNED_SHORT, 0);
       }
 
       function initWebGL() {
@@ -105,32 +117,144 @@
         renderLoop();
       }
 
-      function addCube(width=0.5, center={x:0.0, y:0.0, z:0.0}, color={r:1.0, g:1.0, b:1.0, a:1.0}) {
+      /**
+      * Adds a new cube to the scene on the path's origin.
+      */
+      function addCube(width=0.5, color={r:1.0, g:1.0, b:1.0, a:1.0}) {
         solidShapes.push(new Cube(vertices, indices, colors,
-                                   width, center, color
+                                   width, {x: path[0][0], y: path[0][1], z: path[0][2]}, color
                                  ));
-        vertexBuffer = getVertexBufferWithVertices(vertices);
-        colorBuffer = getVertexBufferWithVertices(colors);
-        indexBuffer = getIndexBufferWithIndices(indices);
+        initBuffers();
       }
 
-      function addTetrahedron(width=0.5, center={x:0.0, y:0.0, z:0.0}, color={r:1.0, g:1.0, b:1.0, a:1.0}) {
+      /**
+      * Adds a new tetrahedron to the scene on the path's origin.
+      */
+      function addTetrahedron(width=0.5, color={r:1.0, g:1.0, b:1.0, a:1.0}) {
         solidShapes.push(new Tetrahedron(vertices, indices, colors,
-                                          width, center, color
+                                          width, {x: path[0][0], y: path[0][1], z: path[0][2]}, color
                                         ));
-         vertexBuffer = getVertexBufferWithVertices(vertices);
-         colorBuffer = getVertexBufferWithVertices(colors);
-         indexBuffer = getIndexBufferWithIndices(indices);
+         initBuffers();
       }
 
+      /**
+      * Moves the given solid shape to a new center.
+      */
       function moveElement(solidShape, newCenter) {
         solidShape.move(newCenter);
         vertexBuffer = getVertexBufferWithVertices(vertices);
       }
 
+      /**
+      * Rotates the given solid shape of a given angle around the specified axis.
+      */
       function rotateElement(solidShape, angle, xAxis=true, yAxis=true, zAxis=true) {
         solidShape.rotate(angle, xAxis, yAxis, zAxis);
         vertexBuffer = getVertexBufferWithVertices(vertices);
+      }
+
+      /**
+      * Removes the given solid shape (at given index in the solidShapes array) from the scene
+      * and the solidShapes array. Updates the offsets of each remaining solid shape.
+      */
+      function removeElement(solidShape, index) {
+        solidShape.delete(); // removes the shape's values from the shared arrays (vertices, indices, colors)
+        for (let i=index+1; i<solidShapes.length; i++) // updates each remaining solid shape's offsets in shared arrays
+          solidShapes[i].updateOffsets(solidShapes[index].numberVertices*3,
+                                       solidShapes[index].numberIndices,
+                                       solidShapes[index].numberVertices*4);
+        solidShapes.splice(index, 1); // remove the solid shape from the solidShapes array
+        initBuffers();
+      }
+
+      /**
+      * Moves the given solid along the path.
+      */
+      function moveAlongPath(solidShape, dt, index) {
+        let delta = solidShape.speed * dt / 1000; // computes the step for this iteration
+
+        let dir = vec3.create();
+
+        // retrieves the current position and creates the direction vector (destination - current pos)
+        let currPos = vec3.fromValues(solidShape.center.x, solidShape.center.y, solidShape.center.z);
+        vec3.sub(dir, path[solidShape.lastPathPoint+1], currPos);
+        vec3.normalize(dir, dir); // normalize the direction
+        vec3.scale(dir, dir, delta); // multiply the direction vector by the step
+
+        let newPos = vec3.create();
+        vec3.add(newPos, currPos, dir); // new position is the old one added to the movement vector
+
+        // moves the solid shape to its new position
+        moveElement(solidShape, {x: newPos[0], y: newPos[1], z: newPos[2]});
+
+        // if the distance between the current position and our goal is smaller than an error
+        if (vec3.distance(currPos, path[solidShape.lastPathPoint+1]) < SAME_POINT_DETECTION_ERROR) {
+          solidShape.lastPathPoint++; // increment the path's control point id
+
+          // move the solid shape to the path's control point (to avoid accumulating errors)
+          moveElement(solidShape, {x: path[solidShape.lastPathPoint][0], y: path[solidShape.lastPathPoint][1], z: path[solidShape.lastPathPoint][2]});
+
+          // if the last path's control point has been reached
+          if (solidShape.lastPathPoint >= path.length-1)
+            removeElement(solidShape, index); // remove the solid shape
+        }
+      }
+
+      /**
+      * Initializes the path (Bézier curve) which will be followed by the solid shapes.
+      */
+      function initPath(numberIterations) {
+        // set control points (first is origin and last is goal)
+        let controlPoints = [vec3.fromValues(-1.0, 0.0, 0.0),
+                             vec3.fromValues(-0.5, -0.5, 0.0),
+                             vec3.fromValues(0.5, 0.5, 0.0),
+                             vec3.fromValues(1.0, 0.0, 0.0)];
+
+        const inc = 1/numberIterations; // sets the delta for the Bézier curve
+
+        path.push(controlPoints[0]); // push origin
+        for (let i=0; i+2<controlPoints.length; i++) { // this loop is probably wrong as the Bézier curve does not works 100% yet
+          for (let t=0; t<1; t+=inc) { // for each t value create a new point on the curve
+            // computes vec(P0P1) * t
+            let p0p1 = vec3.create();
+            vec3.sub(p0p1, controlPoints[i+1], controlPoints[i+0]);
+            vec3.scale(p0p1, p0p1, t);
+
+            // computes PA = P0 + vec(P0P1) * t
+            let pa = vec3.create();
+            vec3.add(pa, controlPoints[i+0], p0p1);
+
+            // computes vec(P1P2) * t
+            let p1p2 = vec3.create();
+            vec3.sub(p1p2, controlPoints[i+2], controlPoints[i+1]);
+            vec3.scale(p1p2, p1p2, t);
+
+            // computes PB = P1 + vec(P1P2) * t
+            let pb = vec3.create();
+            vec3.add(pb, controlPoints[i+1], p1p2);
+
+            // computes vec(PAPB) * t
+            let papb = vec3.create();
+            vec3.sub(papb, pb, pa);
+            vec3.scale(papb, papb, t);
+
+            // computes P = PA + vec(PAPB) * t
+            let p = vec3.create();
+            vec3.add(p, pa, papb);
+
+            path.push(p); // push the new point
+          }
+        }
+        path.push(controlPoints[controlPoints.length-1]); // push goal
+
+
+        // (tmp) drawing
+        // vertices = []; indices = []; colors = [];
+        // for (let i=0; i<path.length; i++) {
+        //   vertices.push(path[i][0], path[i][1], path[i][2]);
+        //   indices.push(i);
+        //   colors.push(1.0,.0,.0,1.0);
+        // }
       }
     </script>
   </head>
@@ -150,9 +274,9 @@
     <div id="control-panel">
       <div class="user-input">
         <p>Ajouter un cube :</p>
-        <input type="button" value="Ajouter un cube" onclick="addCube(0.2, {x: -.75, y: -.75, z: -.2}, {r: 0.6, g: 1.0, b: 0.7, a: 1.0})" />
+        <input type="button" value="Ajouter un cube" onclick="addCube(0.2, {r: 0.6, g: 0.9, b: 0.7, a: 0.9})" />
         <p>Ajouter un tétraèdre :</p>
-        <input type="button" value="Ajouter un tétraèdre" onclick="addTetrahedron(0.4, {x: .75, y: .75, z: -.2}, {r: 0.6, g: 1.0, b: 1.0, a: 1.0})" />
+        <input type="button" value="Ajouter un tétraèdre" onclick="addTetrahedron(0.4, {r: 0.6, g: 0.9, b: 0.9, a: 0.9})" />
       </div>
     </div>
   </body>

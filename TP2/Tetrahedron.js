@@ -1,6 +1,6 @@
 class Tetrahedron extends SolidShape {
   constructor(vertices, indices, colors, width=1.0, center={x:1.0, y:1.0, z:1.0}, color={r:1.0, g:1.0, b:1.0, a:1.0}) {
-    super(vertices, indices, colors, center, color, 4);
+    super(vertices, indices, colors, center, color, 4, 12);
 
     this.width = width;
 
@@ -19,27 +19,29 @@ class Tetrahedron extends SolidShape {
                       );
   }
 
-  setIndices() {
-    this.indices.push(this.indicesOffset+0,
-                      this.indicesOffset+1,
-                      this.indicesOffset+2,
+  setIndices(hasBeenInitialized=false) {
+    this.indices.splice(this.indicesOffset, // index,
+                        hasBeenInitialized ? this.numberIndices : 0, // number of elements to remove before pushing
+                        this.verticesOffset/3+0,
+                        this.verticesOffset/3+1,
+                        this.verticesOffset/3+2,
 
-                      this.indicesOffset+1,
-                      this.indicesOffset+2,
-                      this.indicesOffset+3,
+                        this.verticesOffset/3+1,
+                        this.verticesOffset/3+2,
+                        this.verticesOffset/3+3,
 
-                      this.indicesOffset+0,
-                      this.indicesOffset+2,
-                      this.indicesOffset+3,
+                        this.verticesOffset/3+0,
+                        this.verticesOffset/3+2,
+                        this.verticesOffset/3+3,
 
-                      this.indicesOffset+0,
-                      this.indicesOffset+1,
-                      this.indicesOffset+3
+                        this.verticesOffset/3+0,
+                        this.verticesOffset/3+1,
+                        this.verticesOffset/3+3
                );
   }
 
   setColors() {
-    for (let i=0; i<this.vertices.length/3; i++)
+    for (let i=0; i<this.numberVertices; i++)
       colors.push(this.color.r, this.color.g, this.color.b, this.color.a);
   }
 }
