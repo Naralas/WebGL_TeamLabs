@@ -45,13 +45,9 @@
       var pMatrix = mat4.create();
       var solidShapes = [];
 
-      var cameraPos = [0.0, 0.0, -3.0];
-
+      var cameraPos = [4.0, -2.5, -6.0];
       var path = [];
-      initPath(10);
-
       var lastTime = performance.now();
-      const SAME_POINT_DETECTION_ERROR = 0.01;
 
       function initShaderParameters(prg) {
         prg.vertexPositionAttribute = glContext.getAttribLocation(prg, "aVertexPosition");
@@ -78,7 +74,6 @@
         }
         lastTime = performance.now();
 
-
         glContext.clearColor(0.9, 0.9, 0.9, 1.0);
         glContext.enable(glContext.DEPTH_TEST);
         glContext.clear(glContext.COLOR_BUFFER_BIT | glContext.DEPTH_BUFFER_BIT);
@@ -87,6 +82,8 @@
         mat4.identity(pMatrix);
         mat4.identity(mvMatrix);
 
+        mat4.rotate(mvMatrix, mvMatrix, degToRad(15), [1.0, 0.0, 0.0]);
+        mat4.rotate(mvMatrix, mvMatrix, degToRad(35), [0.0, 1.0, 0.0]);
         mat4.translate(mvMatrix, mvMatrix, cameraPos);
 
         // sets the perspective
@@ -106,13 +103,15 @@
         glContext.vertexAttribPointer(prg.colorAttribute, 4, glContext.FLOAT, false, 0, 0);
 
         glContext.bindBuffer(glContext.ELEMENT_ARRAY_BUFFER, indexBuffer);
-        glContext.drawElements(glContext.TRIANGLES, indices.length, glContext.UNSIGNED_SHORT, 0);
-        // glContext.drawElements(glContext.LINE_STRIP, indices.length, glContext.UNSIGNED_SHORT, 0);
+        glContext.drawElements(glContext.LINE_STRIP, path.length, glContext.UNSIGNED_SHORT, 0);
+        glContext.drawElements(glContext.TRIANGLES, indices.length-path.length, glContext.UNSIGNED_SHORT, path.length * 2);
       }
 
       function initWebGL() {
         glContext = getGLContext('webgl-canvas');
         initProgram();
+        initPath(35); // Initializes the path
+        initStaticScene(); // Initializes the static scene
         initBuffers();
         renderLoop();
       }
@@ -188,7 +187,7 @@
         moveElement(solidShape, {x: newPos[0], y: newPos[1], z: newPos[2]});
 
         // if the distance between the current position and our goal is smaller than an error
-        if (vec3.distance(currPos, path[solidShape.lastPathPoint+1]) < SAME_POINT_DETECTION_ERROR) {
+        if (vec3.distance(currPos, path[solidShape.lastPathPoint+1]) < solidShape.positionComparaisonError) {
           solidShape.lastPathPoint++; // increment the path's control point id
 
           // move the solid shape to the path's control point (to avoid accumulating errors)
@@ -201,60 +200,90 @@
       }
 
       /**
+      * Initializes the static objects on the scene.
+      */
+      function initStaticScene() {
+        let indicesOffset = indices.length;
+        // ground
+        let groundCenter = {x: 0.0, y: 0.0, z: 0.0};
+        let groundSize = {width: 5.0, depth: 5.0};
+        vertices.push(groundCenter.x - groundSize.width/2, groundCenter.y, groundCenter.z + groundSize.depth/2,
+                      groundCenter.x - groundSize.width/2, groundCenter.y, groundCenter.z - groundSize.depth/2,
+                      groundCenter.x + groundSize.width/2, groundCenter.y, groundCenter.z - groundSize.depth/2,
+                      groundCenter.x + groundSize.width/2, groundCenter.y, groundCenter.z + groundSize.depth/2);
+        indices.push(indicesOffset+0, indicesOffset+1, indicesOffset+2,
+                     indicesOffset+0, indicesOffset+2, indicesOffset+3);
+        colors.push(0.6, 0.6, 0.6, 1.0,
+                    0.6, 0.6, 0.6, 1.0,
+                    0.6, 0.6, 0.6, 1.0,
+                    0.6, 0.6, 0.6, 1.0);
+        // walls
+        // let wallHeight = 5.0;
+        // vertices.push(groundCenter.x + groundSize.width/2, groundCenter.y, groundCenter.z - groundSize.depth/2,
+        //               groundCenter.x + groundSize.width/2, groundCenter.y, groundCenter.z + groundSize.depth/2,
+        //               groundCenter.x + groundSize.width/2, groundCenter.y + wallHeight, groundCenter.z + groundSize.depth/2,
+        //               groundCenter.x + groundSize.width/2, groundCenter.y + wallHeight, groundCenter.z - groundSize.depth/2,
+        //               groundCenter.x - groundSize.width/2, groundCenter.y, groundCenter.z - groundSize.depth/2,
+        //               groundCenter.x - groundSize.width/2, groundCenter.y + wallHeight, groundCenter.z - groundSize.depth/2);
+        // indices.push(indicesOffset+4, indicesOffset+5, indicesOffset+6,
+        //              indicesOffset+4, indicesOffset+6, indicesOffset+7,
+        //              indicesOffset+8, indicesOffset+4, indicesOffset+7,
+        //              indicesOffset+8, indicesOffset+7, indicesOffset+9);
+        // colors.push(0.6, 0.4, 0.4, 1.0,
+        //             0.6, 0.4, 0.4, 1.0,
+        //             0.6, 0.4, 0.4, 1.0,
+        //             0.6, 0.4, 0.4, 1.0,
+        //             0.6, 0.4, 0.4, 1.0,
+        //             0.6, 0.4, 0.4, 1.0);
+      }
+
+      /**
       * Initializes the path (Bézier curve) which will be followed by the solid shapes.
       */
       function initPath(numberIterations) {
         // set control points (first is origin and last is goal)
-        let controlPoints = [vec3.fromValues(-1.0, 0.0, 0.0),
-                             vec3.fromValues(-0.5, -0.5, 0.0),
-                             vec3.fromValues(0.5, 0.5, 0.0),
-                             vec3.fromValues(1.0, 0.0, 0.0)];
+        let controlPoints = [vec3.fromValues(  4.9, 1.0, -4.9),
+                             vec3.fromValues(  0.0, 1.1, -4.9),
+                             vec3.fromValues( -4.9, 1.2, -4.9),
+                             vec3.fromValues( -4.9, 1.3,  0.0),
+                             vec3.fromValues( -4.9, 1.4,  4.9),
+                             vec3.fromValues(  0.0, 1.5,  4.9),
+                             vec3.fromValues(  4.9, 1.6,  4.9),
+                             vec3.fromValues(  4.9, 1.7,  0.0),
+                             vec3.fromValues(  0.0, 1.8,  3.5),
+                             vec3.fromValues( -3.5, 1.9, -3.5),
+                             vec3.fromValues( -3.5, 2.0,  0.0),
+                             vec3.fromValues(  3.5, 2.1,  3.5)] ;
 
         const inc = 1/numberIterations; // sets the delta for the Bézier curve
 
-        path.push(controlPoints[0]); // push origin
-        for (let i=0; i+2<controlPoints.length; i++) { // this loop is probably wrong as the Bézier curve does not works 100% yet
-          for (let t=0; t<1; t+=inc) { // for each t value create a new point on the curve
-            // computes vec(P0P1) * t
-            let p0p1 = vec3.create();
-            vec3.sub(p0p1, controlPoints[i+1], controlPoints[i+0]);
-            vec3.scale(p0p1, p0p1, t);
+        for (let t=0; t<1; t+=inc) // computes cuve points
+          CastelJau(t, controlPoints, controlPoints.length);
+        path.reverse();
 
-            // computes PA = P0 + vec(P0P1) * t
-            let pa = vec3.create();
-            vec3.add(pa, controlPoints[i+0], p0p1);
-
-            // computes vec(P1P2) * t
-            let p1p2 = vec3.create();
-            vec3.sub(p1p2, controlPoints[i+2], controlPoints[i+1]);
-            vec3.scale(p1p2, p1p2, t);
-
-            // computes PB = P1 + vec(P1P2) * t
-            let pb = vec3.create();
-            vec3.add(pb, controlPoints[i+1], p1p2);
-
-            // computes vec(PAPB) * t
-            let papb = vec3.create();
-            vec3.sub(papb, pb, pa);
-            vec3.scale(papb, papb, t);
-
-            // computes P = PA + vec(PAPB) * t
-            let p = vec3.create();
-            vec3.add(p, pa, papb);
-
-            path.push(p); // push the new point
-          }
+        // adds points to webgl arrays
+        for (let i=0; i<path.length; i++) {
+          vertices.push(path[i][0], path[i][1], path[i][2]);
+          indices.push(i);
+          colors.push(0.0, 0.0, 1.0, 0.3);
         }
-        path.push(controlPoints[controlPoints.length-1]); // push goal
+      }
 
-
-        // (tmp) drawing
-        // vertices = []; indices = []; colors = [];
-        // for (let i=0; i<path.length; i++) {
-        //   vertices.push(path[i][0], path[i][1], path[i][2]);
-        //   indices.push(i);
-        //   colors.push(1.0,.0,.0,1.0);
-        // }
+      /**
+      * Castlejau implementation adapted from : http://fvirtman.free.fr/recueil/02_03_09_bezier.c.php
+      * Used to create a Bézier curve with given control points.
+      */
+      function CastelJau(t, controlPoints, nbPoints) {
+        let subtab = [];
+        if (nbPoints == 1) {
+          path.push(controlPoints[0]);
+          return;
+        }
+        for (let i=0; i<nbPoints-1; i++)
+          subtab.push(vec3.fromValues(t * controlPoints[i][0] + (1-t) * controlPoints[i+1][0],
+                                      t * controlPoints[i][1] + (1-t) * controlPoints[i+1][1],
+                                      t * controlPoints[i][2] + (1-t) * controlPoints[i+1][2]));
+        CastelJau(t, subtab, nbPoints-1);
       }
     </script>
   </head>
@@ -267,16 +296,16 @@
     <p>
       Le but du laboratoire était de ...
     </p>
-    <canvas id="webgl-canvas" width="500" height="500">
+    <canvas id="webgl-canvas" width="800" height="600">
       HTML5 is not supported
     </canvas>
 
     <div id="control-panel">
       <div class="user-input">
         <p>Ajouter un cube :</p>
-        <input type="button" value="Ajouter un cube" onclick="addCube(0.2, {r: 0.6, g: 0.9, b: 0.7, a: 0.9})" />
+        <input type="button" value="Ajouter un cube" onclick="addCube(0.4, {r: 1.0, g: 0.0, b: 0.0, a: 0.8})" />
         <p>Ajouter un tétraèdre :</p>
-        <input type="button" value="Ajouter un tétraèdre" onclick="addTetrahedron(0.4, {r: 0.6, g: 0.9, b: 0.9, a: 0.9})" />
+        <input type="button" value="Ajouter un tétraèdre" onclick="addTetrahedron(0.4, {r: 0.0, g: 1.0, b: 0.0, a: 0.8})" />
       </div>
     </div>
   </body>

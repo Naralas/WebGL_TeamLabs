@@ -11,7 +11,8 @@ class SolidShape {
     this.numberIndices = numberIndices;
 
     this.center = center;
-    this.speed = 1;
+    this.speed, this.positionComparaisonError;
+    this.changeSpeed(1);
     this.lastPathPoint = 0;
     this.color = color;
 
@@ -86,5 +87,10 @@ class SolidShape {
     // replace the old vertices by the new ones and move the solid back to its original position
     this.vertices.splice.apply(this.vertices, [this.verticesOffset, this.numberVertices*3].concat(newVertices));
     this.move(oldCenter);
+  }
+
+  changeSpeed(newSpeed) {
+    this.speed = newSpeed;
+    this.positionComparaisonError = 0.01 * this.speed;
   }
 }
