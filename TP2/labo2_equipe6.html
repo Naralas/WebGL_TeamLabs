@@ -44,6 +44,7 @@
     		precision highp float;
         #endif
         varying vec4 vColor;
+        //varying highp vec3 vLighting;
 
         /*uniform vec3 uLightPosition[16];
         uniform vec3 uLightColor[16];
@@ -51,7 +52,7 @@
         uniform bool uLightIsDirectional[16]; */    
 
     	void main(void) {
-            gl_FragColor = vColor;
+            gl_FragColor = vec4(vColor.rgb, 1.0);
 
             /*// Calculate incoming light for all light sources
             vec3 reflectedLightColor;
@@ -80,6 +81,7 @@
       var indices = [];
       var vertices = [];
       var colors = [];
+      var normals = [];
 
       var mvMatrix = mat4.create();
       var pMatrix = mat4.create();
@@ -90,8 +92,11 @@
       var lastTime = performance.now();
 
       function initShaderParameters(prg) {
-        prg.vertexPositionAttribute = glContext.getAttribLocation(prg, "aVertexPosition");
+        prg.vertexPositionAttribute = glContext.getAttribLocation(prg, "aVertexPosition");  
         glContext.enableVertexAttribArray(prg.vertexPositionAttribute);
+
+        //prg.vertexNormalAttribute 		= glContext.getAttribLocation(prg, "aVertexNormal");
+        //glContext.enableVertexAttribArray(prg.vertexNormalAttribute);
 
         prg.colorAttribute = glContext.getAttribLocation(prg, "aColor");
         glContext.enableVertexAttribArray(prg.colorAttribute);
@@ -105,6 +110,7 @@
         vertexBuffer = getVertexBufferWithVertices(vertices);
         colorBuffer = getVertexBufferWithVertices(colors);
         indexBuffer = getIndexBufferWithIndices(indices);
+        normalBuffers = getVertexBufferWithVertices(normals);
       }
 
       function drawScene() {
@@ -137,6 +143,7 @@
         glContext.uniformMatrix4fv(prg.pMatrixUniform, false, pMatrix);
         glContext.uniformMatrix4fv(prg.mvMatrixUniform, false, mvMatrix);
 
+        
         var normalMatrix = mat4.create();
         mat4.invert(normalMatrix, mvMatrix);
         normalMatrix = mat4.transpose(normalMatrix, normalMatrix);

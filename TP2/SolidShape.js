@@ -3,6 +3,7 @@ class SolidShape {
     this.vertices = vertices;
     this.indices = indices;
     this.colors = colors;
+    this.normals = normals;
 
     this.verticesOffset = this.vertices.length;
     this.indicesOffset = this.indices.length;
@@ -98,11 +99,6 @@ class SolidShape {
 
   setNormals()
   {
-    console.log(this.indicesOffset);
-    console.log(this.numberIndices);
-    console.log(this.verticesOffset);
-    console.log(this.numberVertices);
-
     for(var i = this.indicesOffset; i < this.indicesOffset + this.numberIndices; i+= 3)
     {
         var points = [];
