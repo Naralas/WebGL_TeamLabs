@@ -1,19 +1,38 @@
 class SolidShape {
-  constructor(vertices, indices, colors, center, color, numberVertices) {
+  constructor(vertices, indices, colors, center, color, numberVertices, numberIndices) {
     this.vertices = vertices;
     this.indices = indices;
     this.colors = colors;
 
     this.verticesOffset = this.vertices.length;
-    this.indicesOffset = this.vertices.length/3;
-    this.colorsOffset = this.colors;
+    this.indicesOffset = this.indices.length;
+    this.colorsOffset = this.colors.length;
     this.numberVertices = numberVertices;
+    this.numberIndices = numberIndices;
 
     this.center = center;
+    this.speed, this.positionComparaisonError;
+    this.changeSpeed(1);
+    this.lastPathPoint = 0;
     this.color = color;
+
+    this.normals = [];
 
     if (new.target === SolidShape)
       throw new TypeError("Cannot construct SolidShape instances directly.");
+  }
+
+  delete() {
+    this.vertices.splice(this.verticesOffset, this.numberVertices*3);
+    this.indices.splice(this.indicesOffset, this.numberIndices);
+    this.colors.splice(this.colorsOffset, this.numberVertices*4);
+  }
+
+  updateOffsets(deltaVertices, deltaIndices, deltaColors) {
+    this.verticesOffset -= deltaVertices;
+    this.indicesOffset -= deltaIndices;
+    this.colorsOffset -= deltaColors;
+    this.setIndices(true);
   }
 
   setVertices() { throw new Error("This method must be implemented by derived classes."); }
@@ -70,5 +89,53 @@ class SolidShape {
     // replace the old vertices by the new ones and move the solid back to its original position
     this.vertices.splice.apply(this.vertices, [this.verticesOffset, this.numberVertices*3].concat(newVertices));
     this.move(oldCenter);
+  }
+
+  changeSpeed(newSpeed) {
+    this.speed = newSpeed;
+    this.positionComparaisonError = 0.01 * this.speed;
+  }
+
+  setNormals()
+  {
+    console.log(this.indicesOffset);
+    console.log(this.numberIndices);
+    console.log(this.verticesOffset);
+    console.log(this.numberVertices);
+
+    for(var i = this.indicesOffset; i < this.indicesOffset + this.numberIndices; i+= 3)
+    {
+        var points = [];
+        for(var j = i; j < i + 3; j++)
+        {
+            var point = [this.vertices[this.indices[j]], this.vertices[this.indices[j]+1], this.vertices[this.indices[j]+2]];
+            points.push(point);
+        }
+
+        this.normals[i / 3] = this.findNormal(points[0],points[1], points[2]);
+        console.log(this.normals[i / 3]);
+    }
+  }
+
+  findNormal(v1, v2, v3)
+  {
+    var vNormal = [0.0, 0.0, 0.0];
+
+    vNormal[0] = (v2[1] - v1[1]) * (v3[2] - v1[2])  -   (v2[2] - v1[2]) * (v3[1] - v1[1]);
+    vNormal[1] = (v2[2] - v1[2]) * (v3[0] - v1[0])  -   (v2[0] - v1[0]) * (v3[2] - v1[2]);
+    vNormal[2] = (v2[0] - v1[0]) * (v3[1] - v1[1])  -   (v2[1] - v1[1]) * (v3[0] - v1[0]);
+
+    var norm = Math.sqrt(vNormal[0] * vNormal[0] + vNormal[1] * vNormal[1] + vNormal[2] * vNormal[2]);
+
+    if(norm > 0.0)
+    {
+        vNormal[0] /= norm;
+        vNormal[1] /= norm;
+        vNormal[2] /= norm;
+    }
+    else
+        console.info("Null vector");
+
+    return vNormal;
   }
 }

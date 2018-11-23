@@ -1,4 +1,4 @@
-<<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="fr">
   <head>
     <meta charset="utf-8" />
@@ -12,14 +12,14 @@
     <script src="./Tetrahedron.js"></script>
 
     <script id="shader-vs" type="x-shader/x-vertex">
-      attribute vec3 aVertexPosition;
-    	attribute vec4 aColor;
-    	uniform mat4 uMVMatrix;
-      uniform mat4 uPMatrix;
-      uniform highp mat4 uNormalMatrix;
-      varying vec4 vColor;     
+        attribute vec3 aVertexPosition;
+        attribute vec4 aColor;
+        uniform mat4 uMVMatrix;
+        uniform mat4 uPMatrix;
+        uniform highp mat4 uNormalMatrix;
+        varying vec4 vColor;     
 
-      varying highp vec3 vLighting;
+        varying highp vec3 vLighting;
 
     	void main(void) {
   	    vColor = aColor;
@@ -28,33 +28,55 @@
 
         // Apply lighting effect
     
-        highp vec3 ambientLight = vec3(0.6, 0.6, 0.6);
+        /*highp vec3 ambientLight = vec3(0.6, 0.6, 0.6);
         highp vec3 directionalLightColor = vec3(0.5, 0.5, 0.75);
-        highp vec3 directionalVector = vec3(0.85, 0.8, 0.75);
+        highp vec3 directionalVector = vec3(0.85, 0.8, 0.75);*/
         
-        highp vec4 transformedNormal = uNormalMatrix * vec4(aVertexNormal, 1.0);
+        //highp vec4 transformedNormal = uNormalMatrix * vec4(aVertexNormal, 1.0);
         
-        highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
-        vLighting = ambientLight + (directionalLightColor * directional);
+        //highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
+        //vLighting = ambientLight + (directionalLightColor * directional);
   	  }
     </script>
 
     <script id="shader-fs" type="x-shader/x-fragment">
-      #ifdef GL_ES
+        #ifdef GL_ES
     		precision highp float;
-    	#endif
-      varying vec4 vColor;
-      varying highp vec3 vLighting;
+        #endif
+        varying vec4 vColor;
+
+        /*uniform vec3 uLightPosition[16];
+        uniform vec3 uLightColor[16];
+        uniform vec3 uLightDirection[16];
+        uniform bool uLightIsDirectional[16]; */    
+
     	void main(void) {
-    		gl_FragColor = vec4(vColor.rgb * vLighting, vColor.a);
-    	}
+            gl_FragColor = vColor;
+
+            /*// Calculate incoming light for all light sources
+            vec3 reflectedLightColor;
+            for(int i = 0; i < 16; i++) {
+                vec3 lightDirection = normalize(uLightPosition[i], vPosition.xyz);
+                if (lightIsDirectional[i]) {
+                reflectedLightColor += max(dot(vTransformedNormal, uLightDirection[i]), 0.0) * uLightColor[i];
+                }
+                else  {
+                reflectedLightColor += max(dot(normalize(vTransformedNormal, lightDirection), 0.0) * uLightColor[i];
+                }
+            }
+            glFragColor = vec4(uAmbientColor + reflectedLightColor * vColor, 1.0);
+            */
+        }
+        
+
+
+
     </script>
 
     <script>
       var vertexBuffer = null;
       var indexBuffer = null;
       var colorBuffer = null;
-
       var indices = [];
       var vertices = [];
       var colors = [];
@@ -63,7 +85,9 @@
       var pMatrix = mat4.create();
       var solidShapes = [];
 
-      var cameraPos = [0.0, 0.0, -2.0];
+      var cameraPos = [4.0, -2.5, -6.0];
+      var path = [];
+      var lastTime = performance.now();
 
       function initShaderParameters(prg) {
         prg.vertexPositionAttribute = glContext.getAttribLocation(prg, "aVertexPosition");
@@ -74,6 +98,7 @@
 
         prg.pMatrixUniform = glContext.getUniformLocation(prg, "uPMatrix");
         prg.mvMatrixUniform = glContext.getUniformLocation(prg, "uMVMatrix");
+        prg.nUniform = glContext.getUniformLocation(prg, 'uNormalMatrix');
       }
 
       function initBuffers() {
@@ -83,6 +108,13 @@
       }
 
       function drawScene() {
+        // for each solid shape, rotate and move it as long as its on the path
+        for (let i=solidShapes.length-1; i>=0; i--) {
+          rotateElement(solidShapes[i], 1, true, true, true); // rotate 1 degree on each axis
+          moveAlongPath(solidShapes[i], performance.now() - lastTime, i);
+        }
+        lastTime = performance.now();
+
         glContext.clearColor(0.9, 0.9, 0.9, 1.0);
         glContext.enable(glContext.DEPTH_TEST);
         glContext.clear(glContext.COLOR_BUFFER_BIT | glContext.DEPTH_BUFFER_BIT);
@@ -91,19 +123,24 @@
         mat4.identity(pMatrix);
         mat4.identity(mvMatrix);
 
-        // mat4.rotate(mvMatrix, mvMatrix, degToRad(10), [0.0, 1.0, 0.0]);
-        // mat4.rotate(mvMatrix, mvMatrix, degToRad(10), [0.0, 0.0, 1.0]);
+        mat4.rotate(mvMatrix, mvMatrix, degToRad(15), [1.0, 0.0, 0.0]);
+        mat4.rotate(mvMatrix, mvMatrix, degToRad(35), [0.0, 1.0, 0.0]);
         mat4.translate(mvMatrix, mvMatrix, cameraPos);
 
+        // sets the perspective
         const fieldOfView = degToRad(45);
         const aspect = glContext.canvas.clientWidth / glContext.canvas.clientHeight;
         const zNear = 0.1;
         const zFar = 100.0;
-
         mat4.perspective(pMatrix, fieldOfView, aspect, zNear, zFar);
 
         glContext.uniformMatrix4fv(prg.pMatrixUniform, false, pMatrix);
         glContext.uniformMatrix4fv(prg.mvMatrixUniform, false, mvMatrix);
+
+        var normalMatrix = mat4.create();
+        mat4.invert(normalMatrix, mvMatrix);
+        normalMatrix = mat4.transpose(normalMatrix, normalMatrix);
+        glContext.uniformMatrix4fv(prg.nUniform, false, normalMatrix);
 
         glContext.bindBuffer(glContext.ARRAY_BUFFER, vertexBuffer);
         glContext.vertexAttribPointer(prg.vertexPositionAttribute, 3, glContext.FLOAT, false, 0, 0);
@@ -112,93 +149,189 @@
         glContext.vertexAttribPointer(prg.colorAttribute, 4, glContext.FLOAT, false, 0, 0);
 
         glContext.bindBuffer(glContext.ELEMENT_ARRAY_BUFFER, indexBuffer);
-        glContext.drawElements(glContext.TRIANGLES, indices.length, glContext.UNSIGNED_SHORT,0);
 
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, cubeVerticesNormalBuffer);
-        gl.vertexAttribPointer(vertexNormalAttribute, 3, gl.FLOAT, false, 0, 0);
-
-        var normalMatrix = mvMatrix.inverse();
-        normalMatrix = normalMatrix.transpose();
-        var nUniform = gl.getUniformLocation(shaderProgram, 'uNormalMatrix');
-        gl.uniformMatrix4fv(nUniform, false, new WebGLFloatArray(normalMatrix.flatten()));
+        glContext.drawElements(glContext.LINE_STRIP, path.length, glContext.UNSIGNED_SHORT, 0);
+        glContext.drawElements(glContext.TRIANGLES, indices.length-path.length, glContext.UNSIGNED_SHORT, path.length * 2);
       }
 
       function initWebGL() {
         glContext = getGLContext('webgl-canvas');
         initProgram();
+        initPath(35); // Initializes the path
+        initStaticScene(); // Initializes the static scene
         initBuffers();
         renderLoop();
       }
 
-      function addCube(width=0.5, center={x:0.0, y:0.0, z:0.0}, color={r:1.0, g:1.0, b:1.0, a:1.0}) {
+      /**
+      * Adds a new cube to the scene on the path's origin.
+      */
+      function addCube(width=0.5, color={r:1.0, g:1.0, b:1.0, a:1.0}) {
         solidShapes.push(new Cube(vertices, indices, colors,
-                                   width, center, color
+                                   width, {x: path[0][0], y: path[0][1], z: path[0][2]}, color
                                  ));
-        cubeVerticesNormalBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, cubeVerticesNormalBuffer);
-
-        var vertexNormals = [
-            // Front
-            0.0,  0.0,  1.0,
-            0.0,  0.0,  1.0,
-            0.0,  0.0,  1.0,
-            0.0,  0.0,  1.0,
-            
-            // Back
-            0.0,  0.0, -1.0,
-            0.0,  0.0, -1.0,
-            0.0,  0.0, -1.0,
-            0.0,  0.0, -1.0,
-            
-            // Top
-            0.0,  1.0,  0.0,
-            0.0,  1.0,  0.0,
-            0.0,  1.0,  0.0,
-            0.0,  1.0,  0.0,
-            
-            // Bottom
-            0.0, -1.0,  0.0,
-            0.0, -1.0,  0.0,
-            0.0, -1.0,  0.0,
-            0.0, -1.0,  0.0,
-            
-            // Right
-            1.0,  0.0,  0.0,
-            1.0,  0.0,  0.0,
-            1.0,  0.0,  0.0,
-            1.0,  0.0,  0.0,
-            
-            // Left
-            -1.0,  0.0,  0.0,
-            -1.0,  0.0,  0.0,
-            -1.0,  0.0,  0.0,
-            -1.0,  0.0,  0.0
-        ];
-
-        gl.bufferData(gl.ARRAY_BUFFER, new WebGLFloatArray(vertexNormals), gl.STATIC_DRAW);
-        vertexBuffer = getVertexBufferWithVertices(vertices);
-        colorBuffer = getVertexBufferWithVertices(colors);
-        indexBuffer = getIndexBufferWithIndices(indices);
+        initBuffers();
       }
 
-      function addTetrahedron(width=0.5, center={x:0.0, y:0.0, z:0.0}, color={r:1.0, g:1.0, b:1.0, a:1.0}) {
+      /**
+      * Adds a new tetrahedron to the scene on the path's origin.
+      */
+      function addTetrahedron(width=0.5, color={r:1.0, g:1.0, b:1.0, a:1.0}) {
         solidShapes.push(new Tetrahedron(vertices, indices, colors,
-                                          width, center, color
+                                          width, {x: path[0][0], y: path[0][1], z: path[0][2]}, color
                                         ));
-         vertexBuffer = getVertexBufferWithVertices(vertices);
-         colorBuffer = getVertexBufferWithVertices(colors);
-         indexBuffer = getIndexBufferWithIndices(indices);
+         initBuffers();
       }
 
+      /**
+      * Moves the given solid shape to a new center.
+      */
       function moveElement(solidShape, newCenter) {
         solidShape.move(newCenter);
         vertexBuffer = getVertexBufferWithVertices(vertices);
       }
 
+      /**
+      * Rotates the given solid shape of a given angle around the specified axis.
+      */
       function rotateElement(solidShape, angle, xAxis=true, yAxis=true, zAxis=true) {
         solidShape.rotate(angle, xAxis, yAxis, zAxis);
         vertexBuffer = getVertexBufferWithVertices(vertices);
+      }
+
+      /**
+      * Removes the given solid shape (at given index in the solidShapes array) from the scene
+      * and the solidShapes array. Updates the offsets of each remaining solid shape.
+      */
+      function removeElement(solidShape, index) {
+        solidShape.delete(); // removes the shape's values from the shared arrays (vertices, indices, colors)
+        for (let i=index+1; i<solidShapes.length; i++) // updates each remaining solid shape's offsets in shared arrays
+          solidShapes[i].updateOffsets(solidShapes[index].numberVertices*3,
+                                       solidShapes[index].numberIndices,
+                                       solidShapes[index].numberVertices*4);
+        solidShapes.splice(index, 1); // remove the solid shape from the solidShapes array
+        initBuffers();
+      }
+
+      /**
+      * Moves the given solid along the path.
+      */
+      function moveAlongPath(solidShape, dt, index) {
+        let delta = solidShape.speed * dt / 1000; // computes the step for this iteration
+
+        let dir = vec3.create();
+
+        // retrieves the current position and creates the direction vector (destination - current pos)
+        let currPos = vec3.fromValues(solidShape.center.x, solidShape.center.y, solidShape.center.z);
+        vec3.sub(dir, path[solidShape.lastPathPoint+1], currPos);
+        vec3.normalize(dir, dir); // normalize the direction
+        vec3.scale(dir, dir, delta); // multiply the direction vector by the step
+
+        let newPos = vec3.create();
+        vec3.add(newPos, currPos, dir); // new position is the old one added to the movement vector
+
+        // moves the solid shape to its new position
+        moveElement(solidShape, {x: newPos[0], y: newPos[1], z: newPos[2]});
+
+        // if the distance between the current position and our goal is smaller than an error
+        if (vec3.distance(currPos, path[solidShape.lastPathPoint+1]) < solidShape.positionComparaisonError) {
+          solidShape.lastPathPoint++; // increment the path's control point id
+
+          // move the solid shape to the path's control point (to avoid accumulating errors)
+          moveElement(solidShape, {x: path[solidShape.lastPathPoint][0], y: path[solidShape.lastPathPoint][1], z: path[solidShape.lastPathPoint][2]});
+
+          // if the last path's control point has been reached
+          if (solidShape.lastPathPoint >= path.length-1)
+            removeElement(solidShape, index); // remove the solid shape
+        }
+      }
+
+      /**
+      * Initializes the static objects on the scene.
+      */
+      function initStaticScene() {
+        let indicesOffset = indices.length;
+        // ground
+        let groundCenter = {x: 0.0, y: 0.0, z: 0.0};
+        let groundSize = {width: 5.0, depth: 5.0};
+        vertices.push(groundCenter.x - groundSize.width/2, groundCenter.y, groundCenter.z + groundSize.depth/2,
+                      groundCenter.x - groundSize.width/2, groundCenter.y, groundCenter.z - groundSize.depth/2,
+                      groundCenter.x + groundSize.width/2, groundCenter.y, groundCenter.z - groundSize.depth/2,
+                      groundCenter.x + groundSize.width/2, groundCenter.y, groundCenter.z + groundSize.depth/2);
+        indices.push(indicesOffset+0, indicesOffset+1, indicesOffset+2,
+                     indicesOffset+0, indicesOffset+2, indicesOffset+3);
+        colors.push(0.6, 0.6, 0.6, 1.0,
+                    0.6, 0.6, 0.6, 1.0,
+                    0.6, 0.6, 0.6, 1.0,
+                    0.6, 0.6, 0.6, 1.0);
+        // walls
+        // let wallHeight = 5.0;
+        // vertices.push(groundCenter.x + groundSize.width/2, groundCenter.y, groundCenter.z - groundSize.depth/2,
+        //               groundCenter.x + groundSize.width/2, groundCenter.y, groundCenter.z + groundSize.depth/2,
+        //               groundCenter.x + groundSize.width/2, groundCenter.y + wallHeight, groundCenter.z + groundSize.depth/2,
+        //               groundCenter.x + groundSize.width/2, groundCenter.y + wallHeight, groundCenter.z - groundSize.depth/2,
+        //               groundCenter.x - groundSize.width/2, groundCenter.y, groundCenter.z - groundSize.depth/2,
+        //               groundCenter.x - groundSize.width/2, groundCenter.y + wallHeight, groundCenter.z - groundSize.depth/2);
+        // indices.push(indicesOffset+4, indicesOffset+5, indicesOffset+6,
+        //              indicesOffset+4, indicesOffset+6, indicesOffset+7,
+        //              indicesOffset+8, indicesOffset+4, indicesOffset+7,
+        //              indicesOffset+8, indicesOffset+7, indicesOffset+9);
+        // colors.push(0.6, 0.4, 0.4, 1.0,
+        //             0.6, 0.4, 0.4, 1.0,
+        //             0.6, 0.4, 0.4, 1.0,
+        //             0.6, 0.4, 0.4, 1.0,
+        //             0.6, 0.4, 0.4, 1.0,
+        //             0.6, 0.4, 0.4, 1.0);
+      }
+
+      /**
+      * Initializes the path (Bézier curve) which will be followed by the solid shapes.
+      */
+      function initPath(numberIterations) {
+        // set control points (first is origin and last is goal)
+        let controlPoints = [vec3.fromValues(  4.9, 1.0, -4.9),
+                             vec3.fromValues(  0.0, 1.1, -4.9),
+                             vec3.fromValues( -4.9, 1.2, -4.9),
+                             vec3.fromValues( -4.9, 1.3,  0.0),
+                             vec3.fromValues( -4.9, 1.4,  4.9),
+                             vec3.fromValues(  0.0, 1.5,  4.9),
+                             vec3.fromValues(  4.9, 1.6,  4.9),
+                             vec3.fromValues(  4.9, 1.7,  0.0),
+                             vec3.fromValues(  0.0, 1.8,  3.5),
+                             vec3.fromValues( -3.5, 1.9, -3.5),
+                             vec3.fromValues( -3.5, 2.0,  0.0),
+                             vec3.fromValues(  3.5, 2.1,  3.5)] ;
+
+        const inc = 1/numberIterations; // sets the delta for the Bézier curve
+
+        for (let t=0; t<1; t+=inc) // computes cuve points
+          CastelJau(t, controlPoints, controlPoints.length);
+        path.reverse();
+
+        // adds points to webgl arrays
+        for (let i=0; i<path.length; i++) {
+          vertices.push(path[i][0], path[i][1], path[i][2]);
+          indices.push(i);
+          colors.push(0.0, 0.0, 1.0, 0.3);
+        }
+      }
+
+      /**
+      * Castlejau implementation adapted from : http://fvirtman.free.fr/recueil/02_03_09_bezier.c.php
+      * Used to create a Bézier curve with given control points.
+      */
+      function CastelJau(t, controlPoints, nbPoints) {
+        let subtab = [];
+        if (nbPoints == 1) {
+          path.push(controlPoints[0]);
+          return;
+        }
+        for (let i=0; i<nbPoints-1; i++)
+          subtab.push(vec3.fromValues(t * controlPoints[i][0] + (1-t) * controlPoints[i+1][0],
+                                      t * controlPoints[i][1] + (1-t) * controlPoints[i+1][1],
+                                      t * controlPoints[i][2] + (1-t) * controlPoints[i+1][2]));
+        CastelJau(t, subtab, nbPoints-1);
       }
     </script>
   </head>
@@ -211,16 +344,16 @@
     <p>
       Le but du laboratoire était de ...
     </p>
-    <canvas id="webgl-canvas" width="500" height="500">
+    <canvas id="webgl-canvas" width="800" height="600">
       HTML5 is not supported
     </canvas>
 
     <div id="control-panel">
       <div class="user-input">
         <p>Ajouter un cube :</p>
-        <input type="button" value="Ajouter un cube" onclick="addCube(0.2, {x: -.75, y: -.75, z: -.2}, {r: 0.6, g: 1.0, b: 0.7, a: 1.0})" />
+        <input type="button" value="Ajouter un cube" onclick="addCube(0.4, {r: 1.0, g: 0.0, b: 0.0, a: 0.8})" />
         <p>Ajouter un tétraèdre :</p>
-        <input type="button" value="Ajouter un tétraèdre" onclick="addTetrahedron(0.4, {x: .75, y: .75, z: -.2}, {r: 0.6, g: 1.0, b: 1.0, a: 1.0})" />
+        <input type="button" value="Ajouter un tétraèdre" onclick="addTetrahedron(0.4, {r: 0.0, g: 1.0, b: 0.0, a: 0.8})" />
       </div>
     </div>
   </body>
