@@ -96,9 +96,9 @@ class SolidShape {
   }
 
   setNormals(hasBeenInitialized=false) {
-    for(var i = 0; i < this.numberIndices; i+= 3) {
+    for(let i = 0; i < this.numberIndices; i+= 3) {
       let points = [];
-      for(var j = this.indicesOffset + i; j < this.indicesOffset + i + 3; j++)
+      for(let j = this.indicesOffset + i; j < this.indicesOffset + i + 3; j++)
           points.push([this.vertices[this.indices[j]],
                        this.vertices[this.indices[j]+1],
                        this.vertices[this.indices[j]+2]]
@@ -124,9 +124,11 @@ class SolidShape {
       vNormal[0] /= norm;
       vNormal[1] /= norm;
       vNormal[2] /= norm;
-    } else
-      console.info("Null vector");
 
-    return vNormal;
+      return vNormal;
+    } else {
+      console.log("Null vector");
+      return [0.0, 0.0, 0.0];
+    }
   }
 }

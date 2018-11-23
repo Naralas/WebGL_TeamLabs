@@ -11,38 +11,38 @@
     <script src="./Cube.js"></script>
     <script src="./Tetrahedron.js"></script>
 
+    <!-- Vertex Shader -->
     <script id="shader-vs" type="x-shader/x-vertex">
       attribute vec3 aVertexPosition;
       attribute vec3 aVertexNormal;
       attribute vec4 aColor;
       uniform mat4 uMVMatrix;
       uniform mat4 uPMatrix;
-      uniform highp mat4 uNormalMatrix;
+      uniform mat4 uNormalMatrix;
       varying vec4 vColor;
-
-      varying highp vec3 vLighting;
+      varying vec3 vLighting;
 
     	void main(void) {
   	    vColor = aColor;
         gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
 
         // Apply lighting effect
-
-        /*highp vec3 ambientLight = vec3(0.6, 0.6, 0.6);
+        highp vec3 ambientLight = vec3(0.6, 0.6, 0.6);
         highp vec3 directionalLightColor = vec3(0.5, 0.5, 0.75);
         highp vec3 directionalVector = vec3(0.85, 0.8, 0.75);
 
         highp vec4 transformedNormal = uNormalMatrix * vec4(aVertexNormal, 1.0);
 
         highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
-        vLighting = ambientLight + (directionalLightColor * directional);*/
+        vLighting = ambientLight + (directionalLightColor * directional);
   	  }
     </script>
 
+    <!-- Fragment Shader -->
     <script id="shader-fs" type="x-shader/x-fragment">
       #ifdef GL_ES
-  		precision highp float;
-      #endif
+    		precision highp float;
+    	#endif
       varying vec4 vColor;
       varying highp vec3 vLighting;
 
@@ -73,44 +73,47 @@
     </script>
 
     <script>
+      // buffers
       var vertexBuffer = null;
       var indexBuffer = null;
       var colorBuffer = null;
       var normalBuffer = null;
 
+      // scene geometry
       var indices = [];
       var vertices = [];
       var colors = [];
       var normals = [];
 
+      // camera
       var mvMatrix = mat4.create();
       var pMatrix = mat4.create();
-      var solidShapes = [];
-
       var cameraPos = [4.0, -2.5, -6.0];
+
+      // scene
+      var solidShapes = [];
       var path = [];
       var lastTime = performance.now();
 
       function initShaderParameters(prg) {
         prg.vertexPositionAttribute = glContext.getAttribLocation(prg, "aVertexPosition");
+        prg.vertexNormalAttribute   = glContext.getAttribLocation(prg, "aVertexNormal");
+        prg.colorAttribute          = glContext.getAttribLocation(prg, "aColor");
+
         glContext.enableVertexAttribArray(prg.vertexPositionAttribute);
-
-        prg.vertexNormalAttribute = glContext.getAttribLocation(prg, "aVertexNormal");
-        // glContext.enableVertexAttribArray(prg.vertexNormalAttribute); // error
-
-        prg.colorAttribute = glContext.getAttribLocation(prg, "aColor");
+        glContext.enableVertexAttribArray(prg.vertexNormalAttribute);
         glContext.enableVertexAttribArray(prg.colorAttribute);
 
-        prg.pMatrixUniform = glContext.getUniformLocation(prg, "uPMatrix");
+        prg.pMatrixUniform  = glContext.getUniformLocation(prg, "uPMatrix");
         prg.mvMatrixUniform = glContext.getUniformLocation(prg, "uMVMatrix");
-        prg.nUniform = glContext.getUniformLocation(prg, "uNormalMatrix");
+        prg.nUniform        = glContext.getUniformLocation(prg, "uNormalMatrix");
       }
 
       function initBuffers() {
-        vertexBuffer = getVertexBufferWithVertices(vertices);
-        colorBuffer = getVertexBufferWithVertices(colors);
-        indexBuffer = getIndexBufferWithIndices(indices);
-        normalBuffer = getVertexBufferWithVertices(normals);
+        vertexBuffer  = getVertexBufferWithVertices(vertices);
+        colorBuffer   = getVertexBufferWithVertices(colors);
+        normalBuffer  = getVertexBufferWithVertices(normals);
+        indexBuffer   = getIndexBufferWithIndices(indices);
       }
 
       function drawScene() {
@@ -149,25 +152,26 @@
         normalMatrix = mat4.transpose(normalMatrix, normalMatrix);
         glContext.uniformMatrix4fv(prg.nUniform, false, normalMatrix);
 
+        glContext.bindBuffer(glContext.ARRAY_BUFFER, normalBuffer);
+        glContext.vertexAttribPointer(prg.vertexNormalAttribute, 3, glContext.FLOAT, false, 0, 0);
+
         glContext.bindBuffer(glContext.ARRAY_BUFFER, vertexBuffer);
         glContext.vertexAttribPointer(prg.vertexPositionAttribute, 3, glContext.FLOAT, false, 0, 0);
-
-        glContext.bindBuffer(glContext.ARRAY_BUFFER, normalBuffer);
-        // glContext.vertexAttribPointer(prg.vertexNormalAttribute, 3, glContext.FLOAT, false, 0, 0); // error
 
         glContext.bindBuffer(glContext.ARRAY_BUFFER, colorBuffer);
         glContext.vertexAttribPointer(prg.colorAttribute, 4, glContext.FLOAT, false, 0, 0);
 
         glContext.bindBuffer(glContext.ELEMENT_ARRAY_BUFFER, indexBuffer);
 
+        // glContext.drawElements(glContext.TRIANGLES, indices.length, glContext.UNSIGNED_SHORT, 0);
         glContext.drawElements(glContext.LINE_STRIP, path.length, glContext.UNSIGNED_SHORT, 0);
         glContext.drawElements(glContext.TRIANGLES, indices.length-path.length, glContext.UNSIGNED_SHORT, path.length * 2);
       }
 
       function initWebGL() {
-        glContext = getGLContext('webgl-canvas');
+        glContext = getGLContext("webgl-canvas");
         initProgram();
-        // initPath(35); // Initializes the path
+        initPath(35); // Initializes the path
         initStaticScene(); // Initializes the static scene
         initBuffers();
         renderLoop();
@@ -275,6 +279,8 @@
                     0.6, 0.6, 0.6, 1.0,
                     0.6, 0.6, 0.6, 1.0);
         normals.push(0.0, 0.0, 0.0,
+                     0.0, 0.0, 0.0,
+                     0.0, 0.0, 0.0,
                      0.0, 0.0, 0.0);
 
         // walls
@@ -330,7 +336,7 @@
           vertices.push(path[i][0], path[i][1], path[i][2]);
           indices.push(i);
           colors.push(0.0, 0.0, 1.0, 0.3);
-          normals.push(0.0);
+          normals.push(0.0, 0.0, 0.0);
         }
       }
 
