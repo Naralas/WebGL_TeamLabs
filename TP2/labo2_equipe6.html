@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<<!DOCTYPE html>
 <html lang="fr">
   <head>
     <meta charset="utf-8" />
@@ -15,11 +15,27 @@
       attribute vec3 aVertexPosition;
     	attribute vec4 aColor;
     	uniform mat4 uMVMatrix;
-    	uniform mat4 uPMatrix;
-    	varying vec4 vColor;
+      uniform mat4 uPMatrix;
+      uniform highp mat4 uNormalMatrix;
+      varying vec4 vColor;     
+
+      varying highp vec3 vLighting;
+
     	void main(void) {
   	    vColor = aColor;
-  	    gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+        gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+        
+
+        // Apply lighting effect
+    
+        highp vec3 ambientLight = vec3(0.6, 0.6, 0.6);
+        highp vec3 directionalLightColor = vec3(0.5, 0.5, 0.75);
+        highp vec3 directionalVector = vec3(0.85, 0.8, 0.75);
+        
+        highp vec4 transformedNormal = uNormalMatrix * vec4(aVertexNormal, 1.0);
+        
+        highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
+        vLighting = ambientLight + (directionalLightColor * directional);
   	  }
     </script>
 
@@ -27,9 +43,10 @@
       #ifdef GL_ES
     		precision highp float;
     	#endif
-	    varying vec4 vColor;
+      varying vec4 vColor;
+      varying highp vec3 vLighting;
     	void main(void) {
-    		gl_FragColor = vColor;
+    		gl_FragColor = vec4(vColor.rgb * vLighting, vColor.a);
     	}
     </script>
 
@@ -96,6 +113,15 @@
 
         glContext.bindBuffer(glContext.ELEMENT_ARRAY_BUFFER, indexBuffer);
         glContext.drawElements(glContext.TRIANGLES, indices.length, glContext.UNSIGNED_SHORT,0);
+
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, cubeVerticesNormalBuffer);
+        gl.vertexAttribPointer(vertexNormalAttribute, 3, gl.FLOAT, false, 0, 0);
+
+        var normalMatrix = mvMatrix.inverse();
+        normalMatrix = normalMatrix.transpose();
+        var nUniform = gl.getUniformLocation(shaderProgram, 'uNormalMatrix');
+        gl.uniformMatrix4fv(nUniform, false, new WebGLFloatArray(normalMatrix.flatten()));
       }
 
       function initWebGL() {
@@ -109,6 +135,48 @@
         solidShapes.push(new Cube(vertices, indices, colors,
                                    width, center, color
                                  ));
+        cubeVerticesNormalBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, cubeVerticesNormalBuffer);
+
+        var vertexNormals = [
+            // Front
+            0.0,  0.0,  1.0,
+            0.0,  0.0,  1.0,
+            0.0,  0.0,  1.0,
+            0.0,  0.0,  1.0,
+            
+            // Back
+            0.0,  0.0, -1.0,
+            0.0,  0.0, -1.0,
+            0.0,  0.0, -1.0,
+            0.0,  0.0, -1.0,
+            
+            // Top
+            0.0,  1.0,  0.0,
+            0.0,  1.0,  0.0,
+            0.0,  1.0,  0.0,
+            0.0,  1.0,  0.0,
+            
+            // Bottom
+            0.0, -1.0,  0.0,
+            0.0, -1.0,  0.0,
+            0.0, -1.0,  0.0,
+            0.0, -1.0,  0.0,
+            
+            // Right
+            1.0,  0.0,  0.0,
+            1.0,  0.0,  0.0,
+            1.0,  0.0,  0.0,
+            1.0,  0.0,  0.0,
+            
+            // Left
+            -1.0,  0.0,  0.0,
+            -1.0,  0.0,  0.0,
+            -1.0,  0.0,  0.0,
+            -1.0,  0.0,  0.0
+        ];
+
+        gl.bufferData(gl.ARRAY_BUFFER, new WebGLFloatArray(vertexNormals), gl.STATIC_DRAW);
         vertexBuffer = getVertexBufferWithVertices(vertices);
         colorBuffer = getVertexBufferWithVertices(colors);
         indexBuffer = getIndexBufferWithIndices(indices);
@@ -157,3 +225,4 @@
     </div>
   </body>
 </html>
+>
