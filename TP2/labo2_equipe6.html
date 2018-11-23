@@ -26,7 +26,6 @@
   	    vColor = aColor;
         gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
 
-
         // Apply lighting effect
 
         /*highp vec3 ambientLight = vec3(0.6, 0.6, 0.6);
@@ -97,14 +96,14 @@
         glContext.enableVertexAttribArray(prg.vertexPositionAttribute);
 
         prg.vertexNormalAttribute = glContext.getAttribLocation(prg, "aVertexNormal");
-        glContext.enableVertexAttribArray(prg.vertexNormalAttribute);
+        // glContext.enableVertexAttribArray(prg.vertexNormalAttribute); // error
 
         prg.colorAttribute = glContext.getAttribLocation(prg, "aColor");
         glContext.enableVertexAttribArray(prg.colorAttribute);
 
         prg.pMatrixUniform = glContext.getUniformLocation(prg, "uPMatrix");
         prg.mvMatrixUniform = glContext.getUniformLocation(prg, "uMVMatrix");
-        prg.nUniform = glContext.getUniformLocation(prg, 'uNormalMatrix');
+        prg.nUniform = glContext.getUniformLocation(prg, "uNormalMatrix");
       }
 
       function initBuffers() {
@@ -145,7 +144,7 @@
         glContext.uniformMatrix4fv(prg.mvMatrixUniform, false, mvMatrix);
 
 
-        var normalMatrix = mat4.create();
+        let normalMatrix = mat4.create();
         mat4.invert(normalMatrix, mvMatrix);
         normalMatrix = mat4.transpose(normalMatrix, normalMatrix);
         glContext.uniformMatrix4fv(prg.nUniform, false, normalMatrix);
@@ -154,13 +153,12 @@
         glContext.vertexAttribPointer(prg.vertexPositionAttribute, 3, glContext.FLOAT, false, 0, 0);
 
         glContext.bindBuffer(glContext.ARRAY_BUFFER, normalBuffer);
-        glContext.vertexAttribPointer(prg.vertexNormalAttribute, 3, glContext.FLOAT, false, 0, 0);
+        // glContext.vertexAttribPointer(prg.vertexNormalAttribute, 3, glContext.FLOAT, false, 0, 0); // error
 
         glContext.bindBuffer(glContext.ARRAY_BUFFER, colorBuffer);
         glContext.vertexAttribPointer(prg.colorAttribute, 4, glContext.FLOAT, false, 0, 0);
 
         glContext.bindBuffer(glContext.ELEMENT_ARRAY_BUFFER, indexBuffer);
-
 
         glContext.drawElements(glContext.LINE_STRIP, path.length, glContext.UNSIGNED_SHORT, 0);
         glContext.drawElements(glContext.TRIANGLES, indices.length-path.length, glContext.UNSIGNED_SHORT, path.length * 2);
