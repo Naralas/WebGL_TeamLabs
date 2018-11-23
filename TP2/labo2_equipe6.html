@@ -13,6 +13,7 @@
 
     <script id="shader-vs" type="x-shader/x-vertex">
         attribute vec3 aVertexPosition;
+        attribute vec3 aVertexNormal;
         attribute vec4 aColor;
         uniform mat4 uMVMatrix;
         uniform mat4 uPMatrix;
@@ -30,12 +31,12 @@
     
         /*highp vec3 ambientLight = vec3(0.6, 0.6, 0.6);
         highp vec3 directionalLightColor = vec3(0.5, 0.5, 0.75);
-        highp vec3 directionalVector = vec3(0.85, 0.8, 0.75);*/
+        highp vec3 directionalVector = vec3(0.85, 0.8, 0.75);
         
-        //highp vec4 transformedNormal = uNormalMatrix * vec4(aVertexNormal, 1.0);
+        highp vec4 transformedNormal = uNormalMatrix * vec4(aVertexNormal, 1.0);
         
-        //highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
-        //vLighting = ambientLight + (directionalLightColor * directional);
+        highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
+        vLighting = ambientLight + (directionalLightColor * directional);*/
   	  }
     </script>
 
@@ -44,15 +45,16 @@
     		precision highp float;
         #endif
         varying vec4 vColor;
-        //varying highp vec3 vLighting;
+        varying highp vec3 vLighting;
 
+        // this is a draft
         /*uniform vec3 uLightPosition[16];
         uniform vec3 uLightColor[16];
         uniform vec3 uLightDirection[16];
         uniform bool uLightIsDirectional[16]; */    
 
     	void main(void) {
-            gl_FragColor = vec4(vColor.rgb, 1.0);
+            gl_FragColor = vec4(vColor.rgb * vLighting, 1.0);
 
             /*// Calculate incoming light for all light sources
             vec3 reflectedLightColor;
@@ -78,6 +80,8 @@
       var vertexBuffer = null;
       var indexBuffer = null;
       var colorBuffer = null;
+      var normalBuffer = null;
+
       var indices = [];
       var vertices = [];
       var colors = [];
@@ -95,8 +99,8 @@
         prg.vertexPositionAttribute = glContext.getAttribLocation(prg, "aVertexPosition");  
         glContext.enableVertexAttribArray(prg.vertexPositionAttribute);
 
-        //prg.vertexNormalAttribute 		= glContext.getAttribLocation(prg, "aVertexNormal");
-        //glContext.enableVertexAttribArray(prg.vertexNormalAttribute);
+        prg.vertexNormalAttribute = glContext.getAttribLocation(prg, "aVertexNormal");
+        glContext.enableVertexAttribArray(prg.vertexNormalAttribute);
 
         prg.colorAttribute = glContext.getAttribLocation(prg, "aColor");
         glContext.enableVertexAttribArray(prg.colorAttribute);
@@ -110,16 +114,16 @@
         vertexBuffer = getVertexBufferWithVertices(vertices);
         colorBuffer = getVertexBufferWithVertices(colors);
         indexBuffer = getIndexBufferWithIndices(indices);
-        normalBuffers = getVertexBufferWithVertices(normals);
+        normalBuffer = getVertexBufferWithVertices(normals);
       }
 
       function drawScene() {
         // for each solid shape, rotate and move it as long as its on the path
-        for (let i=solidShapes.length-1; i>=0; i--) {
+        /*for (let i=solidShapes.length-1; i>=0; i--) {
           rotateElement(solidShapes[i], 1, true, true, true); // rotate 1 degree on each axis
           moveAlongPath(solidShapes[i], performance.now() - lastTime, i);
         }
-        lastTime = performance.now();
+        lastTime = performance.now();*/
 
         glContext.clearColor(0.9, 0.9, 0.9, 1.0);
         glContext.enable(glContext.DEPTH_TEST);
@@ -151,6 +155,9 @@
 
         glContext.bindBuffer(glContext.ARRAY_BUFFER, vertexBuffer);
         glContext.vertexAttribPointer(prg.vertexPositionAttribute, 3, glContext.FLOAT, false, 0, 0);
+
+        glContext.bindBuffer(glContext.ARRAY_BUFFER, normalBuffer);
+        glContext.vertexAttribPointer(prg.vertexNormalAttribute, 3, glContext.FLOAT, false, 0, 0);
 
         glContext.bindBuffer(glContext.ARRAY_BUFFER, colorBuffer);
         glContext.vertexAttribPointer(prg.colorAttribute, 4, glContext.FLOAT, false, 0, 0);
@@ -272,6 +279,10 @@
                     0.6, 0.6, 0.6, 1.0,
                     0.6, 0.6, 0.6, 1.0,
                     0.6, 0.6, 0.6, 1.0);
+        
+        
+
+            
         // walls
         // let wallHeight = 5.0;
         // vertices.push(groundCenter.x + groundSize.width/2, groundCenter.y, groundCenter.z - groundSize.depth/2,
@@ -291,6 +302,28 @@
         //             0.6, 0.4, 0.4, 1.0,
         //             0.6, 0.4, 0.4, 1.0);
       }
+
+        function findNormal(v1, v2, v3)
+        {
+            var vNormal = [0.0, 0.0, 0.0];
+
+            vNormal[0] = (v2[1] - v1[1]) * (v3[2] - v1[2])  -   (v2[2] - v1[2]) * (v3[1] - v1[1]);
+            vNormal[1] = (v2[2] - v1[2]) * (v3[0] - v1[0])  -   (v2[0] - v1[0]) * (v3[2] - v1[2]);
+            vNormal[2] = (v2[0] - v1[0]) * (v3[1] - v1[1])  -   (v2[1] - v1[1]) * (v3[0] - v1[0]);
+
+            var norm = Math.sqrt(vNormal[0] * vNormal[0] + vNormal[1] * vNormal[1] + vNormal[2] * vNormal[2]);
+
+            if(norm > 0.0)
+            {
+                vNormal[0] /= norm;
+                vNormal[1] /= norm;
+                vNormal[2] /= norm;
+            }
+            else
+                console.info("Null vector");
+
+            return vNormal;
+        }
 
       /**
       * Initializes the path (Bézier curve) which will be followed by the solid shapes.
@@ -365,4 +398,14 @@
     </div>
   </body>
 </html>
->
+
+<!-- TODO
+- Gérer l'indexation des vecteurs normaux (avec les offsets etc)
+- Gérer les vecteurs normaux sur l'animation (re-calculer ou déplacer / tourner)
+- Gérer les vecteurs normaux pour la static scene
+- Ajouter plusieurs lumières
+    - UI
+    - Fragment shader (draft de code)
+
+
+-->

@@ -1,5 +1,5 @@
 class SolidShape {
-  constructor(vertices, indices, colors, center, color, numberVertices, numberIndices) {
+  constructor(vertices, indices, colors, normals, center, color, numberVertices, numberIndices) {
     this.vertices = vertices;
     this.indices = indices;
     this.colors = colors;
@@ -16,8 +16,6 @@ class SolidShape {
     this.changeSpeed(1);
     this.lastPathPoint = 0;
     this.color = color;
-
-    this.normals = [];
 
     if (new.target === SolidShape)
       throw new TypeError("Cannot construct SolidShape instances directly.");
@@ -108,8 +106,8 @@ class SolidShape {
             points.push(point);
         }
 
-        this.normals[i / 3] = this.findNormal(points[0],points[1], points[2]);
-        console.log(this.normals[i / 3]);
+        this.normals.push(this.findNormal(points[0],points[1], points[2]));
+        console.log(this.normals);
     }
   }
 
