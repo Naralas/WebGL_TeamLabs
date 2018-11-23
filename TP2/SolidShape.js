@@ -95,40 +95,37 @@ class SolidShape {
     this.positionComparaisonError = 0.01 * this.speed;
   }
 
-  setNormals()
-  {
-    for(var i = this.indicesOffset; i < this.indicesOffset + this.numberIndices; i+= 3)
-    {
-        var points = [];
-        for(var j = i; j < i + 3; j++)
-        {
-            var point = [this.vertices[this.indices[j]], this.vertices[this.indices[j]+1], this.vertices[this.indices[j]+2]];
-            points.push(point);
-        }
+  setNormals(hasBeenInitialized=false) {
+    for(var i = 0; i < this.numberIndices; i+= 3) {
+      let points = [];
+      for(var j = this.indicesOffset + i; j < this.indicesOffset + i + 3; j++)
+          points.push([this.vertices[this.indices[j]],
+                       this.vertices[this.indices[j]+1],
+                       this.vertices[this.indices[j]+2]]
+                     );
 
-        this.normals.push(this.findNormal(points[0],points[1], points[2]));
-        console.log(this.normals);
+      this.normals.splice((this.indicesOffset / 3) + (i / 3), // index
+                          hasBeenInitialized ? 1 : 0, // number of elements to remove before pushing
+                          this.findNormal(points[0],points[1], points[2]));
+      console.log(this.normals);
     }
   }
 
-  findNormal(v1, v2, v3)
-  {
-    var vNormal = [0.0, 0.0, 0.0];
+  findNormal(v1, v2, v3) {
+    let vNormal = [0.0, 0.0, 0.0];
 
     vNormal[0] = (v2[1] - v1[1]) * (v3[2] - v1[2])  -   (v2[2] - v1[2]) * (v3[1] - v1[1]);
     vNormal[1] = (v2[2] - v1[2]) * (v3[0] - v1[0])  -   (v2[0] - v1[0]) * (v3[2] - v1[2]);
     vNormal[2] = (v2[0] - v1[0]) * (v3[1] - v1[1])  -   (v2[1] - v1[1]) * (v3[0] - v1[0]);
 
-    var norm = Math.sqrt(vNormal[0] * vNormal[0] + vNormal[1] * vNormal[1] + vNormal[2] * vNormal[2]);
+    let norm = Math.sqrt(vNormal[0] * vNormal[0] + vNormal[1] * vNormal[1] + vNormal[2] * vNormal[2]);
 
-    if(norm > 0.0)
-    {
-        vNormal[0] /= norm;
-        vNormal[1] /= norm;
-        vNormal[2] /= norm;
-    }
-    else
-        console.info("Null vector");
+    if(norm > 0.0) {
+      vNormal[0] /= norm;
+      vNormal[1] /= norm;
+      vNormal[2] /= norm;
+    } else
+      console.info("Null vector");
 
     return vNormal;
   }
