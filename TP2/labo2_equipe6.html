@@ -20,21 +20,20 @@
       uniform mat4 uPMatrix;
       uniform mat4 uNormalMatrix;
       varying vec4 vColor;
-      varying vec3 vLighting;
+      varying vec3 vNormal;
+			varying vec3 vLightRay;
 
     	void main(void) {
   	    vColor = aColor;
-        gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
 
-        // Apply lighting effect
-        highp vec3 ambientLight = vec3(0.6, 0.6, 0.6);
-        highp vec3 directionalLightColor = vec3(0.5, 0.5, 0.75);
-        highp vec3 directionalVector = vec3(0.85, 0.8, 0.75);
+        vec4 vertex = uMVMatrix * vec4(aVertexPosition, 1.0);
+        if (aVertexNormal != vec3(0.0,0.0,0.0))
+				  vNormal = vec3(uNormalMatrix * vec4(aVertexNormal, 1.0));
+        else
+          vNormal = vec3(0.0,0.0,0.0);
 
-        highp vec4 transformedNormal = uNormalMatrix * vec4(aVertexNormal, 1.0);
-
-        highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
-        vLighting = ambientLight + (directionalLightColor * directional);
+				vLightRay = vertex.xyz - vec3(0.0, 0.0, 1.0);
+				gl_Position = uPMatrix * vertex;
   	  }
     </script>
 
@@ -44,31 +43,23 @@
     		precision highp float;
     	#endif
       varying vec4 vColor;
-      varying highp vec3 vLighting;
-
-      // this is a draft
-      /*
-      uniform vec3 uLightPosition[16];
-      uniform vec3 uLightColor[16];
-      uniform vec3 uLightDirection[16];
-      uniform bool uLightIsDirectional[16];
-      */
+      varying vec3 vNormal;
+      varying vec3 vLightRay;
 
     	void main(void) {
-        gl_FragColor = vec4(vColor.rgb * vLighting, 1.0);
+        vec3 finalColor;
+				finalColor = vColor.rgb;
 
-        // Calculate incoming light for all light sources
-        /*
-        vec3 reflectedLightColor;
-        for(int i = 0; i < 16; i++) {
-          vec3 lightDirection = normalize(uLightPosition[i], vPosition.xyz);
-          if (lightIsDirectional[i])
-            reflectedLightColor += max(dot(vTransformedNormal, uLightDirection[i]), 0.0) * uLightColor[i];
-          else
-            reflectedLightColor += max(dot(normalize(vTransformedNormal, lightDirection), 0.0) * uLightColor[i];
-        }
-        glFragColor = vec4(uAmbientColor + reflectedLightColor * vColor, 1.0);
-        */
+        if (vNormal != vec3(0.0,0.0,0.0)) {
+  				vec3 L = normalize(vLightRay);
+  				vec3 N = normalize(vNormal);
+  				float lambertTerm = dot(N,-L);
+  				finalColor = vColor.rgb;
+  				if(lambertTerm > 0.0)
+  					finalColor *= lambertTerm;
+          gl_FragColor = vec4(finalColor, 1.0);
+        } else
+          gl_FragColor = vec4(1.0, 0.5, 0.5, 1.0);
       }
     </script>
 
@@ -93,6 +84,7 @@
       // scene
       var solidShapes = [];
       var path = [];
+      var drawPath = true;
       var lastTime = performance.now();
 
       function initShaderParameters(prg) {
@@ -146,7 +138,6 @@
         glContext.uniformMatrix4fv(prg.pMatrixUniform, false, pMatrix);
         glContext.uniformMatrix4fv(prg.mvMatrixUniform, false, mvMatrix);
 
-
         let normalMatrix = mat4.create();
         mat4.invert(normalMatrix, mvMatrix);
         normalMatrix = mat4.transpose(normalMatrix, normalMatrix);
@@ -163,9 +154,11 @@
 
         glContext.bindBuffer(glContext.ELEMENT_ARRAY_BUFFER, indexBuffer);
 
-        // glContext.drawElements(glContext.TRIANGLES, indices.length, glContext.UNSIGNED_SHORT, 0);
-        glContext.drawElements(glContext.LINE_STRIP, path.length, glContext.UNSIGNED_SHORT, 0);
-        glContext.drawElements(glContext.TRIANGLES, indices.length-path.length, glContext.UNSIGNED_SHORT, path.length * 2);
+        if (drawPath) {
+          glContext.drawElements(glContext.LINE_STRIP, path.length, glContext.UNSIGNED_SHORT, 0);
+          glContext.drawElements(glContext.TRIANGLES, indices.length-path.length, glContext.UNSIGNED_SHORT, path.length * 2);
+        } else
+          glContext.drawElements(glContext.TRIANGLES, indices.length, glContext.UNSIGNED_SHORT, 0);
       }
 
       function initWebGL() {
@@ -181,7 +174,7 @@
       * Adds a new cube to the scene on the path's origin.
       */
       function addCube(width=0.5, color={r:1.0, g:1.0, b:1.0, a:1.0}) {
-        solidShapes.push(new Cube(vertices, indices, colors,
+        solidShapes.push(new Cube(vertices, indices, colors, normals,
                                    width, {x: path[0][0], y: path[0][1], z: path[0][2]}, color
                                  ));
         initBuffers();
@@ -191,7 +184,7 @@
       * Adds a new tetrahedron to the scene on the path's origin.
       */
       function addTetrahedron(width=0.5, color={r:1.0, g:1.0, b:1.0, a:1.0}) {
-        solidShapes.push(new Tetrahedron(vertices, indices, colors,
+        solidShapes.push(new Tetrahedron(vertices, indices, colors, normals,
                                           width, {x: path[0][0], y: path[0][1], z: path[0][2]}, color
                                         ));
          initBuffers();
@@ -202,7 +195,7 @@
       */
       function moveElement(solidShape, newCenter) {
         solidShape.move(newCenter);
-        vertexBuffer = getVertexBufferWithVertices(vertices);
+        initBuffers();
       }
 
       /**
@@ -210,7 +203,7 @@
       */
       function rotateElement(solidShape, angle, xAxis=true, yAxis=true, zAxis=true) {
         solidShape.rotate(angle, xAxis, yAxis, zAxis);
-        vertexBuffer = getVertexBufferWithVertices(vertices);
+        initBuffers();
       }
 
       /**
@@ -268,17 +261,25 @@
         // ground
         let groundCenter = {x: 0.0, y: 0.0, z: 0.0};
         let groundSize = {width: 5.0, depth: 5.0};
-        vertices.push(groundCenter.x - groundSize.width/2, groundCenter.y, groundCenter.z + groundSize.depth/2,
-                      groundCenter.x - groundSize.width/2, groundCenter.y, groundCenter.z - groundSize.depth/2,
-                      groundCenter.x + groundSize.width/2, groundCenter.y, groundCenter.z - groundSize.depth/2,
-                      groundCenter.x + groundSize.width/2, groundCenter.y, groundCenter.z + groundSize.depth/2);
+        vertices.push(groundCenter.x - groundSize.width/2, groundCenter.y, groundCenter.z + groundSize.depth/2, // P0
+                      groundCenter.x - groundSize.width/2, groundCenter.y, groundCenter.z - groundSize.depth/2, // P1
+                      groundCenter.x + groundSize.width/2, groundCenter.y, groundCenter.z - groundSize.depth/2, // P2
+                      groundCenter.x - groundSize.width/2, groundCenter.y, groundCenter.z + groundSize.depth/2, // P0
+                      groundCenter.x + groundSize.width/2, groundCenter.y, groundCenter.z - groundSize.depth/2, // P2
+                      groundCenter.x + groundSize.width/2, groundCenter.y, groundCenter.z + groundSize.depth/2  // P3
+                    );
         indices.push(indicesOffset+0, indicesOffset+1, indicesOffset+2,
-                     indicesOffset+0, indicesOffset+2, indicesOffset+3);
-        colors.push(0.6, 0.6, 0.6, 1.0,
-                    0.6, 0.6, 0.6, 1.0,
-                    0.6, 0.6, 0.6, 1.0,
-                    0.6, 0.6, 0.6, 1.0);
+                     indicesOffset+3, indicesOffset+4, indicesOffset+5);
+        colors.push(0.6, 0.6, 0.6, 1.0, // P0
+                    0.6, 0.6, 0.6, 1.0, // P1
+                    0.6, 0.6, 0.6, 1.0, // P2
+                    0.6, 0.6, 0.6, 1.0, // P3
+                    0.6, 0.6, 0.6, 1.0, // P4
+                    0.6, 0.6, 0.6, 1.0  // P5
+                  );
         normals.push(0.0, 0.0, 0.0,
+                     0.0, 0.0, 0.0,
+                     0.0, 0.0, 0.0,
                      0.0, 0.0, 0.0,
                      0.0, 0.0, 0.0,
                      0.0, 0.0, 0.0);
@@ -332,11 +333,13 @@
         path.reverse();
 
         // adds points to webgl arrays
-        for (let i=0; i<path.length; i++) {
-          vertices.push(path[i][0], path[i][1], path[i][2]);
-          indices.push(i);
-          colors.push(0.0, 0.0, 1.0, 0.3);
-          normals.push(0.0, 0.0, 0.0);
+        if (drawPath) {
+          for (let i=0; i<path.length; i++) {
+            vertices.push(path[i][0], path[i][1], path[i][2]);
+            indices.push(i);
+            colors.push(0.0, 0.0, 1.0, 0.3);
+            normals.push(0.0, 0.0, 0.0);
+          }
         }
       }
 
@@ -383,12 +386,8 @@
 </html>
 
 <!-- TODO
-- Gérer l'indexation des vecteurs normaux (avec les offsets etc)
-- Gérer les vecteurs normaux sur l'animation (re-calculer ou déplacer / tourner)
-- Gérer les vecteurs normaux pour la static scene
+- Redéfinir la géométrie des objets pour l'adapter au système de lumières
 - Ajouter plusieurs lumières
     - UI
     - Fragment shader (draft de code)
-
-
 -->

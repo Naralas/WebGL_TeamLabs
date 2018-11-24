@@ -88,6 +88,8 @@ class SolidShape {
     // replace the old vertices by the new ones and move the solid back to its original position
     this.vertices.splice.apply(this.vertices, [this.verticesOffset, this.numberVertices*3].concat(newVertices));
     this.move(oldCenter);
+
+    this.setNormals(true);
   }
 
   changeSpeed(newSpeed) {
@@ -96,18 +98,19 @@ class SolidShape {
   }
 
   setNormals(hasBeenInitialized=false) {
-    for(let i = 0; i < this.numberIndices; i+= 3) {
+    for(let i=0; i<this.numberIndices; i+=3) { // for each triangle
       let points = [];
-      for(let j = this.indicesOffset + i; j < this.indicesOffset + i + 3; j++)
-          points.push([this.vertices[this.indices[j]],
-                       this.vertices[this.indices[j]+1],
-                       this.vertices[this.indices[j]+2]]
+      for(let j = this.indicesOffset + i; j < this.indicesOffset + i + 3; j++) // for each vertex in the triangle
+          points.push([this.vertices[this.indices[j]+0],  // vertex x
+                       this.vertices[this.indices[j]+1],  // vertex y
+                       this.vertices[this.indices[j]+2]]  // vertex z
                      );
 
-      this.normals.splice((this.indicesOffset / 3) + (i / 3), // index
-                          hasBeenInitialized ? 1 : 0, // number of elements to remove before pushing
-                          this.findNormal(points[0],points[1], points[2]));
-      console.log(this.normals);
+      let normalVec = this.findNormal(points[0],points[1], points[2]);
+      for (let j=0; j<3; j++)
+        this.normals.splice(this.indicesOffset + i + (j*3), // index
+                            hasBeenInitialized ? 3 : 0, // number of elements to remove before pushing
+                            normalVec[0], normalVec[1], normalVec[2]);
     }
   }
 
