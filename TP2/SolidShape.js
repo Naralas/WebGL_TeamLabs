@@ -25,6 +25,7 @@ class SolidShape {
     this.vertices.splice(this.verticesOffset, this.numberVertices*3);
     this.indices.splice(this.indicesOffset, this.numberIndices);
     this.colors.splice(this.colorsOffset, this.numberVertices*4);
+    this.normals.splice(this.indicesOffset, this.numberVertices*3);
   }
 
   updateOffsets(deltaVertices, deltaIndices, deltaColors) {
