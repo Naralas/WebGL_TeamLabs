@@ -25,7 +25,7 @@ class SolidShape {
     this.vertices.splice(this.verticesOffset, this.numberVertices*3);
     this.indices.splice(this.indicesOffset, this.numberIndices);
     this.colors.splice(this.colorsOffset, this.numberVertices*4);
-    this.normals.splice(this.indicesOffset, this.numberVertices*3);
+    this.normals.splice(this.verticesOffset, this.numberVertices*3);
   }
 
   updateOffsets(deltaVertices, deltaIndices, deltaColors) {
@@ -99,20 +99,29 @@ class SolidShape {
   }
 
   setNormals(hasBeenInitialized=false) {
-    for(let i=0; i<this.numberIndices; i+=3) { // for each triangle
+    let allNormals = [];
+    for(let i=0; i<this.numberVertices/3; i++) { // for each triangle
       let points = [];
-      for(let j = this.indicesOffset + i; j < this.indicesOffset + i + 3; j++) // for each vertex in the triangle
-          points.push([this.vertices[this.indices[j]+0],  // vertex x
-                       this.vertices[this.indices[j]+1],  // vertex y
-                       this.vertices[this.indices[j]+2]]  // vertex z
-                     );
+      for (let j=0; j<9; j+=3) // finds the 3 triangle's vertices
+        points.push([this.vertices[this.verticesOffset + (i*9+j) + 0],  // vertex's x
+                     this.vertices[this.verticesOffset + (i*9+j) + 1],  // vertex's y
+                     this.vertices[this.verticesOffset + (i*9+j) + 2]   // vertex's z
+                  ]);
 
-      let normalVec = this.findNormal(points[0],points[1], points[2]);
-      for (let j=0; j<3; j++)
-        this.normals.splice(this.indicesOffset + i + (j*3), // index
-                            hasBeenInitialized ? 3 : 0, // number of elements to remove before pushing
-                            normalVec[0], normalVec[1], normalVec[2]);
+      // finds triangle's normal and pushes it to the allNormals array once for each triangle's vertex
+      let normalVec = this.findNormal(points[0], points[1], points[2]);
+      allNormals.push(normalVec[0], normalVec[1], normalVec[2], // vertex1's normal
+                      normalVec[0], normalVec[1], normalVec[2], // vertex2's normal
+                      normalVec[0], normalVec[1], normalVec[2]  // vertex3's normal
+                    );
     }
+    
+    // push normals components one by one in the shared normals array
+    for (let i=0; i<allNormals.length; i++)
+      this.normals.splice(this.verticesOffset + i, // index
+                          hasBeenInitialized ? 1 : 0, // number of elements to remove before pushing
+                          allNormals[i]
+                        );
   }
 
   findNormal(v1, v2, v3) {
