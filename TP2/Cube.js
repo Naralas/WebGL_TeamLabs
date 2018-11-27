@@ -32,48 +32,48 @@ class Cube extends SolidShape {
                          this.center.x - this.width/2, this.center.y + this.width/2, this.center.z + this.width/2,  // P2
 
                          this.center.x + this.width/2, this.center.y - this.width/2, this.center.z + this.width/2,  // P1
-                         this.center.x - this.width/2, this.center.y + this.width/2, this.center.z + this.width/2,  // P2
                          this.center.x + this.width/2, this.center.y + this.width/2, this.center.z + this.width/2,  // P3
-                         
+                         this.center.x - this.width/2, this.center.y + this.width/2, this.center.z + this.width/2,  // P2
+
                          this.center.x - this.width/2, this.center.y - this.width/2, this.center.z + this.width/2,  // P0
-                         this.center.x + this.width/2, this.center.y - this.width/2, this.center.z + this.width/2,  // P1
                          this.center.x - this.width/2, this.center.y - this.width/2, this.center.z - this.width/2,  // P6
+                         this.center.x + this.width/2, this.center.y - this.width/2, this.center.z + this.width/2,  // P1
 
                          this.center.x - this.width/2, this.center.y - this.width/2, this.center.z - this.width/2,  // P6
-                         this.center.x + this.width/2, this.center.y - this.width/2, this.center.z + this.width/2,  // P1
                          this.center.x + this.width/2, this.center.y - this.width/2, this.center.z - this.width/2,  // P5
+                         this.center.x + this.width/2, this.center.y - this.width/2, this.center.z + this.width/2,  // P1
 
-                         this.center.x - this.width/2, this.center.y - this.width/2, this.center.z + this.width/2,  // P0                         
                          this.center.x - this.width/2, this.center.y + this.width/2, this.center.z + this.width/2,  // P2
                          this.center.x - this.width/2, this.center.y - this.width/2, this.center.z - this.width/2,  // P6
+                         this.center.x - this.width/2, this.center.y - this.width/2, this.center.z + this.width/2,  // P0
 
                          this.center.x - this.width/2, this.center.y + this.width/2, this.center.z + this.width/2,  // P2
                          this.center.x - this.width/2, this.center.y + this.width/2, this.center.z - this.width/2,  // P7
                          this.center.x - this.width/2, this.center.y - this.width/2, this.center.z - this.width/2,  // P6
 
-                         this.center.x + this.width/2, this.center.y - this.width/2, this.center.z - this.width/2,  // P5
                          this.center.x - this.width/2, this.center.y - this.width/2, this.center.z - this.width/2,  // P6
                          this.center.x - this.width/2, this.center.y + this.width/2, this.center.z - this.width/2,  // P7
+                         this.center.x + this.width/2, this.center.y - this.width/2, this.center.z - this.width/2,  // P5
 
+                         this.center.x + this.width/2, this.center.y - this.width/2, this.center.z - this.width/2,  // P5
+                         this.center.x - this.width/2, this.center.y + this.width/2, this.center.z - this.width/2,  // P7
                          this.center.x + this.width/2, this.center.y + this.width/2, this.center.z - this.width/2,  // P4
-                         this.center.x + this.width/2, this.center.y - this.width/2, this.center.z - this.width/2,  // P5
-                         this.center.x - this.width/2, this.center.y + this.width/2, this.center.z - this.width/2,  // P7
 
-                         this.center.x - this.width/2, this.center.y + this.width/2, this.center.z + this.width/2,  // P2
                          this.center.x + this.width/2, this.center.y + this.width/2, this.center.z + this.width/2,  // P3
                          this.center.x + this.width/2, this.center.y + this.width/2, this.center.z - this.width/2,  // P4
+                         this.center.x - this.width/2, this.center.y + this.width/2, this.center.z + this.width/2,  // P2
 
                          this.center.x - this.width/2, this.center.y + this.width/2, this.center.z + this.width/2,  // P2
+                         this.center.x + this.width/2, this.center.y + this.width/2, this.center.z - this.width/2,  // P4
                          this.center.x - this.width/2, this.center.y + this.width/2, this.center.z - this.width/2,  // P7
-                         this.center.x + this.width/2, this.center.y + this.width/2, this.center.z - this.width/2,  // P4
 
                          this.center.x + this.width/2, this.center.y - this.width/2, this.center.z + this.width/2,  // P1
+                         this.center.x + this.width/2, this.center.y + this.width/2, this.center.z - this.width/2,  // P4
                          this.center.x + this.width/2, this.center.y + this.width/2, this.center.z + this.width/2,  // P3
-                         this.center.x + this.width/2, this.center.y + this.width/2, this.center.z - this.width/2,  // P4
 
                          this.center.x + this.width/2, this.center.y - this.width/2, this.center.z + this.width/2,  // P1
-                         this.center.x + this.width/2, this.center.y + this.width/2, this.center.z - this.width/2,  // P4
-                         this.center.x + this.width/2, this.center.y - this.width/2, this.center.z - this.width/2   // P5
+                         this.center.x + this.width/2, this.center.y - this.width/2, this.center.z - this.width/2,  // P5
+                         this.center.x + this.width/2, this.center.y + this.width/2, this.center.z - this.width/2   // P4
                       );
   }
 
