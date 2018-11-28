@@ -59,7 +59,7 @@
   					finalColor *= lambertTerm;
           gl_FragColor = vec4(finalColor, 1.0);
         } else
-          gl_FragColor = vec4(1.0, 0.5, 0.5, 1.0);
+          gl_FragColor = vec4(finalColor, 1.0);
       }
     </script>
 
@@ -86,6 +86,7 @@
       var path = [];
       var drawPath = true;
       var lastTime = performance.now();
+      var maxNumberOfSolidShapes = 5;
 
       function initShaderParameters(prg) {
         prg.vertexPositionAttribute = glContext.getAttribLocation(prg, "aVertexPosition");
@@ -174,20 +175,26 @@
       * Adds a new cube to the scene on the path's origin.
       */
       function addCube(width=0.5, color={r:1.0, g:1.0, b:1.0, a:1.0}) {
-        solidShapes.push(new Cube(vertices, indices, colors, normals,
-                                   width, {x: path[0][0], y: path[0][1], z: path[0][2]}, color
-                                 ));
-        initBuffers();
+        if (solidShapes.length < maxNumberOfSolidShapes) {
+          solidShapes.push(new Cube(vertices, indices, colors, normals,
+                                     width, {x: path[0][0], y: path[0][1], z: path[0][2]}, color
+                                   ));
+          initBuffers();
+        } else
+         console.log("You can add at most " + maxNumberOfSolidShapes + " elements to the scene.");
       }
 
       /**
       * Adds a new tetrahedron to the scene on the path's origin.
       */
       function addTetrahedron(width=0.5, color={r:1.0, g:1.0, b:1.0, a:1.0}) {
-        solidShapes.push(new Tetrahedron(vertices, indices, colors, normals,
-                                          width, {x: path[0][0], y: path[0][1], z: path[0][2]}, color
-                                        ));
-         initBuffers();
+        if (solidShapes.length < maxNumberOfSolidShapes) {
+          solidShapes.push(new Tetrahedron(vertices, indices, colors, normals,
+                                            width, {x: path[0][0], y: path[0][1], z: path[0][2]}, color
+                                          ));
+           initBuffers();
+         } else
+          console.log("You can add at most " + maxNumberOfSolidShapes + " elements to the scene.");
       }
 
       /**

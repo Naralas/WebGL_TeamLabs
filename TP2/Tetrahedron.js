@@ -25,15 +25,18 @@ class Tetrahedron extends SolidShape {
                          this.center.x - (this.width/2), this.center.y - r, this.center.z - r,  // P0
                          this.center.x + (this.width/2), this.center.y - r, this.center.z - r,  // P1
                          this.center.x,                  this.center.y - r, this.center.z + R,  // P2
+
                          this.center.x + (this.width/2), this.center.y - r, this.center.z - r,  // P1
-                         this.center.x,                  this.center.y - r, this.center.z + R,  // P2
                          this.center.x,                  this.center.y + R, this.center.z,      // P3
+                         this.center.x,                  this.center.y - r, this.center.z + R,  // P2
+
                          this.center.x - (this.width/2), this.center.y - r, this.center.z - r,  // P0
                          this.center.x,                  this.center.y - r, this.center.z + R,  // P2
                          this.center.x,                  this.center.y + R, this.center.z,      // P3
+
                          this.center.x - (this.width/2), this.center.y - r, this.center.z - r,  // P0
-                         this.center.x + (this.width/2), this.center.y - r, this.center.z - r,  // P1 
-                         this.center.x,                  this.center.y + R, this.center.z      // P3                           
+                         this.center.x,                  this.center.y + R, this.center.z,      // P3
+                         this.center.x + (this.width/2), this.center.y - r, this.center.z - r   // P1
                       );
   }
 
@@ -76,7 +79,7 @@ class Tetrahedron extends SolidShape {
                         this.verticesOffset/3+10,
                         this.verticesOffset/3+11
                );
-               
+
   }
 
   setColors() {
