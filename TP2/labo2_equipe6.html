@@ -86,7 +86,15 @@
       var path = [];
       var drawPath = true;
       var lastTime = performance.now();
-      var maxNumberOfSolidShapes = 5;
+      var maxNumberOfSolidShapes = 100;
+      var frameCount = 0;
+      var elapsedTime = 0;
+
+      // render
+      const fieldOfView = degToRad(45);
+      const zNear = 0.1;
+      const zFar = 100.0;
+      var aspect;
 
       function initShaderParameters(prg) {
         prg.vertexPositionAttribute = glContext.getAttribLocation(prg, "aVertexPosition");
@@ -114,9 +122,14 @@
         for (let i=solidShapes.length-1; i>=0; i--) {
           rotateElement(solidShapes[i], 1, true, true, true); // rotate 1 degree on each axis
           moveAlongPath(solidShapes[i], performance.now() - lastTime, i);
+          // moveElement(solidShapes[i], {x: solidShapes[i].center.x+0.02, y: solidShapes[i].center.y, z: solidShapes[i].center.z+0.01})
         }
+
+        // draw fps
+        drawFps();
         lastTime = performance.now();
 
+        // init scene
         glContext.clearColor(0.9, 0.9, 0.9, 1.0);
         glContext.enable(glContext.DEPTH_TEST);
         glContext.clear(glContext.COLOR_BUFFER_BIT | glContext.DEPTH_BUFFER_BIT);
@@ -125,25 +138,25 @@
         mat4.identity(pMatrix);
         mat4.identity(mvMatrix);
 
+        // sets camera position / orientation
         mat4.rotate(mvMatrix, mvMatrix, degToRad(15), [1.0, 0.0, 0.0]);
         mat4.rotate(mvMatrix, mvMatrix, degToRad(35), [0.0, 1.0, 0.0]);
         mat4.translate(mvMatrix, mvMatrix, cameraPos);
 
         // sets the perspective
-        const fieldOfView = degToRad(45);
-        const aspect = glContext.canvas.clientWidth / glContext.canvas.clientHeight;
-        const zNear = 0.1;
-        const zFar = 100.0;
         mat4.perspective(pMatrix, fieldOfView, aspect, zNear, zFar);
 
+        // send the camera matrices
         glContext.uniformMatrix4fv(prg.pMatrixUniform, false, pMatrix);
         glContext.uniformMatrix4fv(prg.mvMatrixUniform, false, mvMatrix);
 
+        // normal matrix
         let normalMatrix = mat4.create();
         mat4.invert(normalMatrix, mvMatrix);
         normalMatrix = mat4.transpose(normalMatrix, normalMatrix);
         glContext.uniformMatrix4fv(prg.nUniform, false, normalMatrix);
 
+        // buffers
         glContext.bindBuffer(glContext.ARRAY_BUFFER, normalBuffer);
         glContext.vertexAttribPointer(prg.vertexNormalAttribute, 3, glContext.FLOAT, false, 0, 0);
 
@@ -155,20 +168,42 @@
 
         glContext.bindBuffer(glContext.ELEMENT_ARRAY_BUFFER, indexBuffer);
 
+        // draw scene
         if (drawPath) {
-          glContext.drawElements(glContext.LINE_STRIP, path.length, glContext.UNSIGNED_SHORT, 0);
-          glContext.drawElements(glContext.TRIANGLES, indices.length-path.length, glContext.UNSIGNED_SHORT, path.length * 2);
+          glContext.drawElements(glContext.LINE_STRIP, path.length, glContext.UNSIGNED_SHORT, 0); // draw path
+          glContext.drawElements(glContext.TRIANGLES, indices.length-path.length, glContext.UNSIGNED_SHORT, path.length * 2); // draw what's left
         } else
           glContext.drawElements(glContext.TRIANGLES, indices.length, glContext.UNSIGNED_SHORT, 0);
+
+        let drawLoopElapsedTime = Math.round((performance.now()-lastTime)*1000)/1000;
+        if (drawLoopElapsedTime > 0.9)
+          console.log(drawLoopElapsedTime);
+        document.getElementById("draw_timeelapsed").innerHTML = drawLoopElapsedTime;
       }
 
       function initWebGL() {
         glContext = getGLContext("webgl-canvas");
+        aspect = glContext.canvas.clientWidth / glContext.canvas.clientHeight;
         initProgram();
-        initPath(35); // Initializes the path
+        initPath(30); // Initializes the path
         initStaticScene(); // Initializes the static scene
         initBuffers();
         renderLoop();
+      }
+
+      /**
+      * Computes and draws FPS.
+      */
+      function drawFps() {
+        frameCount++;
+        elapsedTime += (performance.now() - lastTime);
+        if(elapsedTime >= 1000) {
+          fps = frameCount;
+          frameCount = 0;
+          elapsedTime -= 1000;
+
+          document.getElementById("fps").innerHTML = fps + " fps";
+        }
       }
 
       /**
@@ -380,6 +415,8 @@
     <canvas id="webgl-canvas" width="800" height="600">
       HTML5 is not supported
     </canvas>
+    <div id="fps"></div>
+    <div id="draw_timeelapsed"></div>
 
     <div id="control-panel">
       <div class="user-input">

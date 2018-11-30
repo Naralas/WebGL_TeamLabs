@@ -115,7 +115,7 @@ class SolidShape {
                       normalVec[0], normalVec[1], normalVec[2]  // vertex3's normal
                     );
     }
-    
+
     // push normals components one by one in the shared normals array
     for (let i=0; i<allNormals.length; i++)
       this.normals.splice(this.verticesOffset + i, // index
