@@ -24,7 +24,7 @@
 			varying vec3 vLightRay;
 
     	void main(void) {
-        gl_PointSize = 5.0;
+        gl_PointSize = 15.0;
   	    vColor = aColor;
 
         vec4 vertex = uMVMatrix * vec4(aVertexPosition, 1.0);
@@ -97,6 +97,12 @@
       const zFar = 100.0;
       var aspect;
 
+      // lights
+      var lightsVerticesOffset = 0;
+      var lightsColorsOffset = 0;
+      var lightColorOn = {r: 1.0, g: 1.0, b: 0.0, a: 1.0};
+      var lightColorOff = {r: 0.0, g: 0.0, b: 0.0, a: 1.0};
+
       function initShaderParameters(prg) {
         prg.vertexPositionAttribute = glContext.getAttribLocation(prg, "aVertexPosition");
         prg.vertexNormalAttribute   = glContext.getAttribLocation(prg, "aVertexNormal");
@@ -121,8 +127,12 @@
       function drawScene() {
         // for each solid shape, rotate and move it as long as its on the path
         for (let i=solidShapes.length-1; i>=0; i--) {
+          // if (vec3.distance(vec3.fromValues(solidShapes[i].center.x, solidShapes[i].center.y, solidShapes[i].center.z),
+          // vec3.fromValues(0,0,0)) > 7)
+          //   removeElement(solidShapes[i], i);
+
           rotateElement(solidShapes[i], 1, true, true, true, false); // rotate 1 degree on each axis
-          moveAlongPath(solidShapes[i], performance.now() - lastTime, i);
+          moveAlongPath(solidShapes[i], performance.now() - lastTime, i); // move elements along the Bézier curve
         }
 
         // update buffers
@@ -136,7 +146,7 @@
         lastTime = performance.now();
 
         // init scene
-        glContext.clearColor(0.9, 0.9, 0.9, 1.0);
+        glContext.clearColor(0.2, 0.2, 0.2, 1.0);
         glContext.enable(glContext.DEPTH_TEST);
         glContext.clear(glContext.COLOR_BUFFER_BIT | glContext.DEPTH_BUFFER_BIT);
         glContext.viewport(0, 0, c_width, c_height);
@@ -191,7 +201,7 @@
         aspect = glContext.canvas.clientWidth / glContext.canvas.clientHeight;
 
         initProgram();
-        initPath(30); // Initializes the path
+        initPath(35); // Initializes the path
         initStaticScene(); // Initializes the static scene
         initBuffers();
         renderLoop();
@@ -306,6 +316,34 @@
       }
 
       /**
+      * Changes the given light's position.
+      */
+      function changeLightPos(lightNumber, newPos) {
+        vertices[lightsVerticesOffset + lightNumber * 3 + 1] = newPos;
+        vertexBuffer  = getVertexBufferWithVertices(vertices);
+
+        // todo : update shaders informations
+      }
+
+      /**
+      * Toggles on and off the given light's id.
+      */
+      function toggleLight(lightNumber) {
+        let offset = lightsColorsOffset + (lightNumber * 4);
+        let isOn = colors[offset + 0] == lightColorOn.r &&
+                   colors[offset + 1] == lightColorOn.g &&
+                   colors[offset + 2] == lightColorOn.b &&
+                   colors[offset + 3] == lightColorOn.a;
+        colors[offset + 0] = isOn ? lightColorOff.r : lightColorOn.r;
+        colors[offset + 1] = isOn ? lightColorOff.g : lightColorOn.g;
+        colors[offset + 2] = isOn ? lightColorOff.b : lightColorOn.b;
+        colors[offset + 3] = isOn ? lightColorOff.a : lightColorOn.a;
+        colorBuffer   = getVertexBufferWithVertices(colors);
+
+        // todo : update shaders informations
+      }
+
+      /**
       * Initializes the static objects on the scene.
       */
       function initStaticScene() {
@@ -367,6 +405,8 @@
       * Initializes the static lights objects on the scene.
       */
       function initSceneLights(groundCenter, groundSize) {
+        lightsVerticesOffset = vertices.length;
+        lightsColorsOffset = colors.length;
         let indicesOffset = indices.length;
         vertices.push(groundCenter.x - groundSize.width/2, groundCenter.y, groundCenter.z + groundSize.depth/2, // P0
                       groundCenter.x - groundSize.width/2, groundCenter.y, groundCenter.z - groundSize.depth/2, // P1
@@ -391,18 +431,19 @@
       */
       function initPath(numberIterations) {
         // set control points (first is origin and last is goal)
-        let controlPoints = [vec3.fromValues(  4.9, 1.0, -4.9),
-                             vec3.fromValues(  0.0, 1.1, -4.9),
-                             vec3.fromValues( -4.9, 1.2, -4.9),
-                             vec3.fromValues( -4.9, 1.3,  0.0),
-                             vec3.fromValues( -4.9, 1.4,  4.9),
-                             vec3.fromValues(  0.0, 1.5,  4.9),
-                             vec3.fromValues(  4.9, 1.6,  4.9),
-                             vec3.fromValues(  4.9, 1.7,  0.0),
-                             vec3.fromValues(  0.0, 1.8,  3.5),
-                             vec3.fromValues( -3.5, 1.9, -3.5),
-                             vec3.fromValues( -3.5, 2.0,  0.0),
-                             vec3.fromValues(  3.5, 2.1,  3.5)] ;
+        let controlPoints = [vec3.fromValues( 4.9, 0.1, -4.9),
+                             vec3.fromValues( 0.0, 0.2, -4.9),
+                             vec3.fromValues(-4.9, 0.5, -4.9),
+                             vec3.fromValues(-4.9, 1.4,  0.0),
+                             vec3.fromValues(-4.9, 1.5,  6.9),
+                             vec3.fromValues( 0.0, 1.6,  4.9),
+                             vec3.fromValues( 4.9, 1.7,  4.9),
+                             vec3.fromValues( 4.9, 1.7,  0.0),
+                             vec3.fromValues( 4.9, 2.1, -4.9),
+                             vec3.fromValues( 0.0, 2.3, -4.9),
+                             vec3.fromValues(-4.9, 2.5, -4.9),
+                             vec3.fromValues(-2.9, 2.7,  0.0),
+                             vec3.fromValues(-2.9, 3.4,  1.5)] ;
 
         const inc = 1/numberIterations; // sets the delta for the Bézier curve
 
@@ -415,7 +456,7 @@
           for (let i=0; i<path.length; i++) {
             vertices.push(path[i][0], path[i][1], path[i][2]);
             indices.push(i);
-            colors.push(0.0, 0.0, 1.0, 0.3);
+            colors.push(1.0, 0.0, 0.5, 0.2);
             normals.push(0.0, 0.0, 0.0);
           }
         }
@@ -459,14 +500,20 @@
         <input type="button" value="Ajouter un cube" onclick="addCube(0.4, {r: 1.0, g: 0.0, b: 0.0, a: 0.8})" />
         <p>Ajouter un tétraèdre :</p>
         <input type="button" value="Ajouter un tétraèdre" onclick="addTetrahedron(0.4, {r: 0.0, g: 1.0, b: 0.0, a: 0.8})" />
+
+        <p>Lumière 1</p>
+        <input type="checkbox" checked onchange="toggleLight(0)" />
+        <input type="range" min="0" max="3" value ="0" step="0.1" onchange="changeLightPos(0, this.value)" oninput="changeLightPos(0, this.value)" />
+        <p>Lumière 2</p>
+        <input type="checkbox" checked onchange="toggleLight(1)" />
+        <input type="range" min="0" max="3" value ="0" step="0.1" onchange="changeLightPos(1, this.value)" oninput="changeLightPos(1, this.value)" />
+        <p>Lumière 3</p>
+        <input type="checkbox" checked onchange="toggleLight(2)" />
+        <input type="range" min="0" max="3" value ="0" step="0.1" onchange="changeLightPos(2, this.value)" oninput="changeLightPos(2, this.value)" />
+        <p>Lumière 4</p>
+        <input type="checkbox" checked onchange="toggleLight(3)" />
+        <input type="range" min="0" max="3" value ="0" step="0.1" onchange="changeLightPos(3, this.value)" oninput="changeLightPos(3, this.value)" />
       </div>
     </div>
   </body>
 </html>
-
-<!-- TODO
-- Redéfinir la géométrie des objets pour l'adapter au système de lumières
-- Ajouter plusieurs lumières
-    - UI
-    - Fragment shader (draft de code)
--->
