@@ -112,17 +112,22 @@
 
       function initBuffers() {
         vertexBuffer  = getVertexBufferWithVertices(vertices);
-        colorBuffer   = getVertexBufferWithVertices(colors);
         normalBuffer  = getVertexBufferWithVertices(normals);
+        colorBuffer   = getVertexBufferWithVertices(colors);
         indexBuffer   = getIndexBufferWithIndices(indices);
       }
 
       function drawScene() {
         // for each solid shape, rotate and move it as long as its on the path
         for (let i=solidShapes.length-1; i>=0; i--) {
-          rotateElement(solidShapes[i], 1, true, true, true); // rotate 1 degree on each axis
+          rotateElement(solidShapes[i], 1, true, true, true, false); // rotate 1 degree on each axis
           moveAlongPath(solidShapes[i], performance.now() - lastTime, i);
-          // moveElement(solidShapes[i], {x: solidShapes[i].center.x+0.02, y: solidShapes[i].center.y, z: solidShapes[i].center.z+0.01})
+        }
+
+        // update buffers
+        if (solidShapes.length > 0) {
+          vertexBuffer  = getVertexBufferWithVertices(vertices);
+          normalBuffer  = getVertexBufferWithVertices(normals);
         }
 
         // draw fps
@@ -174,16 +179,12 @@
           glContext.drawElements(glContext.TRIANGLES, indices.length-path.length, glContext.UNSIGNED_SHORT, path.length * 2); // draw what's left
         } else
           glContext.drawElements(glContext.TRIANGLES, indices.length, glContext.UNSIGNED_SHORT, 0);
-
-        let drawLoopElapsedTime = Math.round((performance.now()-lastTime)*1000)/1000;
-        if (drawLoopElapsedTime > 0.9)
-          console.log(drawLoopElapsedTime);
-        document.getElementById("draw_timeelapsed").innerHTML = drawLoopElapsedTime;
       }
 
       function initWebGL() {
         glContext = getGLContext("webgl-canvas");
         aspect = glContext.canvas.clientWidth / glContext.canvas.clientHeight;
+
         initProgram();
         initPath(30); // Initializes the path
         initStaticScene(); // Initializes the static scene
@@ -235,17 +236,21 @@
       /**
       * Moves the given solid shape to a new center.
       */
-      function moveElement(solidShape, newCenter) {
+      function moveElement(solidShape, newCenter, updateBuffers=true) {
         solidShape.move(newCenter);
-        initBuffers();
+        if (updateBuffers)
+          vertexBuffer = getVertexBufferWithVertices(vertices);
       }
 
       /**
       * Rotates the given solid shape of a given angle around the specified axis.
       */
-      function rotateElement(solidShape, angle, xAxis=true, yAxis=true, zAxis=true) {
+      function rotateElement(solidShape, angle, xAxis=true, yAxis=true, zAxis=true, updateBuffers=true) {
         solidShape.rotate(angle, xAxis, yAxis, zAxis);
-        initBuffers();
+        if (updateBuffers) {
+          vertexBuffer  = getVertexBufferWithVertices(vertices);
+          normalBuffer  = getVertexBufferWithVertices(normals);
+        }
       }
 
       /**
@@ -280,7 +285,7 @@
         vec3.add(newPos, currPos, dir); // new position is the old one added to the movement vector
 
         // moves the solid shape to its new position
-        moveElement(solidShape, {x: newPos[0], y: newPos[1], z: newPos[2]});
+        moveElement(solidShape, {x: newPos[0], y: newPos[1], z: newPos[2]}, false);
 
         // if the distance between the current position and our goal is smaller than an error
         if (vec3.distance(currPos, path[solidShape.lastPathPoint+1]) < solidShape.positionComparaisonError) {
@@ -416,7 +421,6 @@
       HTML5 is not supported
     </canvas>
     <div id="fps"></div>
-    <div id="draw_timeelapsed"></div>
 
     <div id="control-panel">
       <div class="user-input">
