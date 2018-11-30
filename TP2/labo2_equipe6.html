@@ -24,6 +24,7 @@
 			varying vec3 vLightRay;
 
     	void main(void) {
+        gl_PointSize = 5.0;
   	    vColor = aColor;
 
         vec4 vertex = uMVMatrix * vec4(aVertexPosition, 1.0);
@@ -173,12 +174,16 @@
 
         glContext.bindBuffer(glContext.ELEMENT_ARRAY_BUFFER, indexBuffer);
 
-        // draw scene
+        // draw elements
+        let numberLightsPoints = 4;
         if (drawPath) {
           glContext.drawElements(glContext.LINE_STRIP, path.length, glContext.UNSIGNED_SHORT, 0); // draw path
-          glContext.drawElements(glContext.TRIANGLES, indices.length-path.length, glContext.UNSIGNED_SHORT, path.length * 2); // draw what's left
-        } else
-          glContext.drawElements(glContext.TRIANGLES, indices.length, glContext.UNSIGNED_SHORT, 0);
+          glContext.drawElements(glContext.POINTS, numberLightsPoints, glContext.UNSIGNED_SHORT, path.length * 2); // draw lights
+          glContext.drawElements(glContext.TRIANGLES, indices.length-path.length-numberLightsPoints, glContext.UNSIGNED_SHORT, (path.length) * 2 + numberLightsPoints * 2); // draw scene
+        } else {
+          glContext.drawElements(glContext.POINTS, numberLightsPoints, glContext.UNSIGNED_SHORT, 0); // draw lights
+          glContext.drawElements(glContext.TRIANGLES, indices.length-numberLightsPoints, glContext.UNSIGNED_SHORT, numberLightsPoints * 2); // draw scene
+        }
       }
 
       function initWebGL() {
@@ -304,10 +309,13 @@
       * Initializes the static objects on the scene.
       */
       function initStaticScene() {
-        let indicesOffset = indices.length;
-        // ground
         let groundCenter = {x: 0.0, y: 0.0, z: 0.0};
         let groundSize = {width: 5.0, depth: 5.0};
+
+        initSceneLights(groundCenter, groundSize);
+
+        let indicesOffset = indices.length;
+        // ground
         vertices.push(groundCenter.x - groundSize.width/2, groundCenter.y, groundCenter.z + groundSize.depth/2, // P0
                       groundCenter.x - groundSize.width/2, groundCenter.y, groundCenter.z - groundSize.depth/2, // P1
                       groundCenter.x + groundSize.width/2, groundCenter.y, groundCenter.z - groundSize.depth/2, // P2
@@ -353,6 +361,29 @@
         //              0.0, 0.0, 0.0, 0.0,
         //              0.0, 0.0, 0.0, 0.0,
         //              0.0, 0.0, 0.0, 0.0);
+      }
+
+      /**
+      * Initializes the static lights objects on the scene.
+      */
+      function initSceneLights(groundCenter, groundSize) {
+        let indicesOffset = indices.length;
+        vertices.push(groundCenter.x - groundSize.width/2, groundCenter.y, groundCenter.z + groundSize.depth/2, // P0
+                      groundCenter.x - groundSize.width/2, groundCenter.y, groundCenter.z - groundSize.depth/2, // P1
+                      groundCenter.x + groundSize.width/2, groundCenter.y, groundCenter.z - groundSize.depth/2, // P2
+                      groundCenter.x + groundSize.width/2, groundCenter.y, groundCenter.z + groundSize.depth/2  // P3
+                    );
+        indices.push(indicesOffset+0, indicesOffset+1, indicesOffset+2, indicesOffset+3);
+        colors.push(1.0, 1.0, 0.0, 1.0, // P0
+                    1.0, 1.0, 0.0, 1.0, // P1
+                    1.0, 1.0, 0.0, 1.0, // P2
+                    1.0, 1.0, 0.0, 1.0  // P3
+                  );
+        normals.push(0.0, 0.0, 0.0,
+                     0.0, 0.0, 0.0,
+                     0.0, 0.0, 0.0,
+                     0.0, 0.0, 0.0
+                   );
       }
 
       /**
