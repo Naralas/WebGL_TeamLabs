@@ -23,21 +23,27 @@
       uniform mat4 uPMatrix;
       uniform mat4 uNormalMatrix;
 
+      uniform vec3 uLightPositions[NB_LIGHTS];
+
       varying vec4 vColor;
-      varying vec3 vNormalInterpolated;
-      varying vec3 vPos;
+      varying vec3 vNormal;
+      varying vec3 vLightRay[NB_LIGHTS];
       
     	void main(void) {
         gl_PointSize = 15.0;
         vColor = aColor;
         
         vec4 vertex = uMVMatrix * vec4(aVertexPosition, 1.0);
-        vPos = vec3(vertex) / vertex.w;
-
         if (aVertexNormal != vec3(0.0,0.0,0.0))
-          vNormalInterpolated = vec3(uNormalMatrix * vec4(aVertexNormal, 0.0));
+        {
+          for(int i = 0; i < NB_LIGHTS; i++)
+            vLightRay[i] = vertex.xyz - uLightPositions[i];
+
+          vNormal = vec3(uNormalMatrix * vec4(aVertexNormal, 1.0));
+        }
         else
-          vNormalInterpolated = vec3(0.0,0.0,0.0);
+          vNormal = vec3(0.0, 0.0, 0.0);
+
 				gl_Position = uPMatrix * vertex;
   	  }
     </script>
@@ -50,27 +56,34 @@
       #define NB_LIGHTS 4
 
       varying vec4 vColor;
-      varying vec3 vNormalInterpolated;
-      varying vec3 vPos;
+      varying vec3 vNormal;
 
-      uniform vec3 uLightPositions[NB_LIGHTS];
-      uniform vec3 uLightColors[NB_LIGHTS];
-
+      varying vec3 vLightRay[NB_LIGHTS];
+      uniform bool uLightToggled[NB_LIGHTS];
+      
     	void main(void) {
         vec3 finalColor;
         finalColor = vColor.rgb;
-        
-        if (vNormalInterpolated != vec3(0.0,0.0,0.0)) {
-          float light;
+
+        vec3 lighting = vec3(1.0, 1.0, 1.0);
+        if(vNormal != vec3(0.0, 0.0, 0.0))
+        {
+          finalColor = vec3(0.0, 0.0, 0.0);
           for(int i = 0; i < NB_LIGHTS; i++)
           {
-            vec3 N = normalize(vNormalInterpolated);
-            vec3 L = normalize(uLightPositions[i] - vPos);
+            if(uLightToggled[i])
+            {
+              vec3 baseColor = vColor.rgb;
+              vec3 L = normalize(vLightRay[i]);
+              vec3 N = normalize(vNormal);
 
-            float lambertTerm = dot(N,-L);
-            finalColor = vColor.rgb;
-            if(lambertTerm > 0.0)
-              finalColor *= lambertTerm;
+              float lambertTerm = dot(N,-L);
+              if(lambertTerm > 0.0)
+              {
+                baseColor *= lambertTerm;
+                finalColor += baseColor;
+              }
+            }
           }
         }
         gl_FragColor = vec4(finalColor, 1.0);
@@ -116,7 +129,11 @@
       var lightColorOn = {r: 1.0, g: 1.0, b: 0.0, a: 1.0};
       var lightColorOff = {r: 0.0, g: 0.0, b: 0.0, a: 1.0};
 
+      var lightEmitColorOn = {r: 1.0, g: 1.0, b: 1.0};
+      var lightEmitColorOff = {r: 0.0, g: 0.0, b: 0.0};
+      
       var lightPositions = [];
+      var lightToggled = [];
 
       function initShaderParameters(prg) {
         prg.vertexPositionAttribute = glContext.getAttribLocation(prg, "aVertexPosition");
@@ -131,6 +148,7 @@
         prg.mvMatrixUniform = glContext.getUniformLocation(prg, "uMVMatrix");
         prg.nUniform        = glContext.getUniformLocation(prg, "uNormalMatrix");
         prg.lightPositionsUniform = glContext.getUniformLocation(prg, "uLightPositions");
+        prg.lightToggledUniform = glContext.getUniformLocation(prg, "uLightToggled");
       }
 
       function initBuffers() {
@@ -184,6 +202,8 @@
 
         // set the lights position
         glContext.uniform3fv(prg.lightPositionsUniform, lightPositions);
+        // set the lights toggled
+        glContext.uniform1iv(prg.lightToggledUniform, lightToggled);
 
         // normal matrix
         let normalMatrix = mat4.create();
@@ -341,7 +361,7 @@
         vertices[lightsVerticesOffset + lightNumber * 3 + 1] = newPos;
         vertexBuffer  = getVertexBufferWithVertices(vertices);
 
-        // todo : update shaders informations
+        lightPositions[lightNumber * 3 + 1] = newPos;
       }
 
       /**
@@ -359,7 +379,10 @@
         colors[offset + 3] = isOn ? lightColorOff.a : lightColorOn.a;
         colorBuffer   = getVertexBufferWithVertices(colors);
 
-        // todo : update shaders informations
+        if(lightToggled[lightNumber] == 0)
+          lightToggled[lightNumber] = 1;
+        else
+          lightToggled[lightNumber] = 0;
       }
 
       /**
@@ -437,8 +460,8 @@
                       groundCenter.x + groundSize.width/2, groundCenter.y, groundCenter.z - groundSize.depth/2, // P2
                       groundCenter.x + groundSize.width/2, groundCenter.y, groundCenter.z + groundSize.depth/2  // P3
                       );
-                      
-        console.log(lightPositions);
+        lightToggled.push(1,1,1,1);
+
 
         indices.push(indicesOffset+0, indicesOffset+1, indicesOffset+2, indicesOffset+3);
         colors.push(1.0, 1.0, 0.0, 1.0, // P0
