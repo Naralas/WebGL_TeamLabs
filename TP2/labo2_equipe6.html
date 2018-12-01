@@ -18,29 +18,26 @@
       attribute vec3 aVertexPosition;
       attribute vec3 aVertexNormal;
       attribute vec4 aColor;
+
       uniform mat4 uMVMatrix;
       uniform mat4 uPMatrix;
       uniform mat4 uNormalMatrix;
 
-      uniform vec3 uLightPositions[NB_LIGHTS];
-      
       varying vec4 vColor;
-      varying vec3 vNormal;
-      varying vec3 vLightRay[NB_LIGHTS];
+      varying vec3 vNormalInterpolated;
+      varying vec3 vPos;
       
     	void main(void) {
         gl_PointSize = 15.0;
-  	    vColor = aColor;
-        vec4 vertex = uMVMatrix * vec4(aVertexPosition, 1.0);
+        vColor = aColor;
         
+        vec4 vertex = uMVMatrix * vec4(aVertexPosition, 1.0);
+        vPos = vec3(vertex) / vertex.w;
+
         if (aVertexNormal != vec3(0.0,0.0,0.0))
-        {
-          vNormal = vec3(uNormalMatrix * vec4(aVertexNormal, 1.0));
-          for(int i = 0; i < NB_LIGHTS; i++)
-            vLightRay[i] = vertex.xyz - uLightPositions[i];
-        }
+          vNormalInterpolated = vec3(uNormalMatrix * vec4(aVertexNormal, 0.0));
         else
-          vNormal = vec3(0.0,0.0,0.0);
+          vNormalInterpolated = vec3(0.0,0.0,0.0);
 				gl_Position = uPMatrix * vertex;
   	  }
     </script>
@@ -53,20 +50,23 @@
       #define NB_LIGHTS 4
 
       varying vec4 vColor;
-      varying vec3 vNormal;
-      varying vec3 vLightRay[NB_LIGHTS];
+      varying vec3 vNormalInterpolated;
+      varying vec3 vPos;
 
+      uniform vec3 uLightPositions[NB_LIGHTS];
       uniform vec3 uLightColors[NB_LIGHTS];
 
     	void main(void) {
         vec3 finalColor;
         finalColor = vColor.rgb;
         
-        if (vNormal != vec3(0.0,0.0,0.0)) {
+        if (vNormalInterpolated != vec3(0.0,0.0,0.0)) {
+          float light;
           for(int i = 0; i < NB_LIGHTS; i++)
           {
-            vec3 L = normalize(vLightRay[i]);
-            vec3 N = normalize(vNormal);
+            vec3 N = normalize(vNormalInterpolated);
+            vec3 L = normalize(uLightPositions[i] - vPos);
+
             float lambertTerm = dot(N,-L);
             finalColor = vColor.rgb;
             if(lambertTerm > 0.0)
