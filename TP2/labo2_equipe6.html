@@ -21,7 +21,9 @@
       uniform mat4 uNormalMatrix;
       varying vec4 vColor;
       varying vec3 vNormal;
-			varying vec3 vLightRay;
+
+      uniform vec3 uLightPositions;
+      varying vec3 vSurfaceToLight;
 
     	void main(void) {
         gl_PointSize = 15.0;
@@ -33,8 +35,10 @@
         else
           vNormal = vec3(0.0,0.0,0.0);
 
-				vLightRay = vertex.xyz - vec3(1.0, 0.0, 1.0);
-				gl_Position = uPMatrix * vertex;
+        vertex = uPMatrix * vertex;
+        gl_Position = vertex;
+        
+        vSurfaceToLight = uLightPositions - vertex.xyz;
   	  }
     </script>
 
@@ -45,22 +49,22 @@
     	#endif
       varying vec4 vColor;
       varying vec3 vNormal;
-      varying vec3 vLightRay;
+
+      varying vec3 vSurfaceToLight;
 
     	void main(void) {
         vec3 finalColor;
 				finalColor = vColor.rgb;
 
         if (vNormal != vec3(0.0,0.0,0.0)) {
-  				vec3 L = normalize(vLightRay);
-  				vec3 N = normalize(vNormal);
-  				float lambertTerm = dot(N,-L);
-  				finalColor = vColor.rgb;
-  				if(lambertTerm > 0.0)
-  					finalColor *= lambertTerm;
-          gl_FragColor = vec4(finalColor, 1.0);
-        } else
-          gl_FragColor = vec4(finalColor, 1.0);
+
+          vec3 N = normalize(vNormal);
+          vec3 vSurfaceToLightDirection = normalize(vSurfaceToLight);
+
+          float light = dot(N, vSurfaceToLightDirection);
+          finalColor *= light;
+        }
+        gl_FragColor = vec4(finalColor, 1.0);
       }
     </script>
 
@@ -115,6 +119,8 @@
         prg.pMatrixUniform  = glContext.getUniformLocation(prg, "uPMatrix");
         prg.mvMatrixUniform = glContext.getUniformLocation(prg, "uMVMatrix");
         prg.nUniform        = glContext.getUniformLocation(prg, "uNormalMatrix");
+
+        prg.lightPositionsUniform = glContext.getUniformLocation(prg, "uLightPositions");
       }
 
       function initBuffers() {
@@ -165,6 +171,9 @@
         // send the camera matrices
         glContext.uniformMatrix4fv(prg.pMatrixUniform, false, pMatrix);
         glContext.uniformMatrix4fv(prg.mvMatrixUniform, false, mvMatrix);
+
+        // set the light position
+        glContext.uniform3fv(prg.lightPositionsUniform, [0.5, 0.5, 1.0]);
 
         // normal matrix
         let normalMatrix = mat4.create();
