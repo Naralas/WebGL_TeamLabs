@@ -32,16 +32,16 @@
       varying vec3 vLightRay[NB_LIGHTS];
       varying vec3 vEyeVec;
 
-
+      
     	void main(void) {
         gl_PointSize = 15.0;
         vColor = aColor;
-
+        
         vec4 vertex = uMVMatrix * vec4(aVertexPosition, 1.0);
         if (aVertexNormal != vec3(0.0,0.0,0.0))
         {
           for(int i = 0; i < NB_LIGHTS; i++)
-            vLightRay[i] = vertex.xyz - uLightPositions[i];
+            vLightRay[i] = vertex.xyz - uLightPositions[i]; 
 
           vNormal = vec3(uNormalMatrix * vec4(aVertexNormal, 1.0));
           vEyeVec = -vec3(vertex.xyz);
@@ -70,27 +70,25 @@
       varying vec3 vLightRay[NB_LIGHTS];
       varying vec3 vEyeVec;
       uniform bool uLightToggled[NB_LIGHTS];
-
+      
       vec3 phongShading()
 			{
-        vec3 finalColor = vColor.rgb;
-
-
+        vec3 finalColor = vColor.rgb * 0.3;
 
         for(int i = 0; i < NB_LIGHTS; i++)
         {
           if(uLightToggled[i])
           {
-            vec3 N = normalize(vNormal);
             vec3 L = normalize(vLightRay[i]);
+            vec3 N = normalize(vNormal);
             float lambertTerm = dot(N,-L);
 
             if(lambertTerm > 0.0)
             {
               finalColor += uMaterialDiffuse * lambertTerm;
-
-              vec3 R = reflect(L, N);
               vec3 E = normalize(vEyeVec);
+              vec3 R = reflect(L, N);
+
               float specular = pow( max(dot(R, E), 0.0), uShininess);
               finalColor += uMaterialSpecular * specular;
             }
@@ -98,36 +96,17 @@
         }
 				return finalColor;
       }
-
+      
     	void main(void) {
         vec4 finalColor = vec4(vColor.rgb, 1.0);
 
         if(vNormal != vec3(0.0, 0.0, 0.0))
         {
-          /*finalColor = vec3(0.0, 0.0, 0.0);
-          for(int i = 0; i < NB_LIGHTS; i++)
-          {
-            if(uLightToggled[i])
-            {
-              vec3 baseColor = vColor.rgb;
-              vec3 L = normalize(vLightRay[i]);
-              vec3 N = normalize(vNormal);
-
-              float lambertTerm = dot(N,-L);
-              if(lambertTerm > 0.0)
-              {
-                baseColor *= lambertTerm;
-                finalColor += baseColor;
-              }
-            }
-          }*/
-
           finalColor = vec4(phongShading(), 1.0);
         }
         gl_FragColor = finalColor;
       }
     </script>
-
     <script>
       // buffers
       var vertexBuffer = null;
@@ -247,9 +226,9 @@
         // set the lights toggled
         glContext.uniform1iv(prg.lightToggledUniform, lightToggled);
 
-        glContext.uniform3f(prg.materialSpecularUniform, 0.5, 0.0, 0.0);
-        glContext.uniform3f(prg.materialDiffuseUniform, 0.9,0.0,0.0);
-        glContext.uniform1f(prg.shininessUniform, 12.0);
+        glContext.uniform3f(prg.materialSpecularUniform, 0.5, 0.5, 0.5);
+        glContext.uniform3f(prg.materialDiffuseUniform, 0.6,0.6,0.6);
+        glContext.uniform1f(prg.shininessUniform, 24.0);
 
         // normal matrix
         let normalMatrix = mat4.create();
