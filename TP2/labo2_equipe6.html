@@ -574,6 +574,28 @@
         CastelJau(t, subtab, nbPoints-1);
       }
     </script>
+
+    <style>
+      .light-div{
+        padding: 5px;
+        border: 1px solid #CCC;
+        border-radius: 4px;
+        vertical-align: middle;
+        margin-bottom: 10px;
+        width: 350px;
+      }
+      
+      .title{
+        line-height: 25px;
+        font-weight: bold;
+      }
+
+      .label{
+        line-height: 25px;
+        margin-left: 25px;
+      }
+    </style>
+
   </head>
   <body onload="initWebGL()">
     <header>
@@ -591,23 +613,33 @@
 
     <div id="control-panel">
       <div class="user-input">
-        <p>Ajouter un cube :</p>
-        <input type="button" value="Ajouter un cube" onclick="addCube(0.4, {r: 1.0, g: 0.0, b: 0.0, a: 0.8})" />
-        <p>Ajouter un tétraèdre :</p>
-        <input type="button" value="Ajouter un tétraèdre" onclick="addTetrahedron(0.4, {r: 0.0, g: 1.0, b: 0.0, a: 0.8})" />
+        <h1>Ajout de forme</h1><br/>
+        <input type="button" value="Ajouter un cube" onclick="addCube(0.4, {r: 1.0, g: 0.0, b: 0.0, a: 0.8})" style="font-size:15px; width: 100px; height: 65px; white-space: normal;"/>
+        <input type="button" value="Ajouter un tétraèdre" onclick="addTetrahedron(0.4, {r: 0.0, g: 1.0, b: 0.0, a: 0.8})" style="font-size:15px; width:100px; height: 65px; white-space: normal;" />
 
-        <p>Lumière 1</p>
-        <input type="checkbox" checked onchange="toggleLight(0)" />
-        <input type="range" min="0" max="3" value ="0" step="0.1" onchange="changeLightPos(0, this.value)" oninput="changeLightPos(0, this.value)" />
-        <p>Lumière 2</p>
-        <input type="checkbox" checked onchange="toggleLight(1)" />
-        <input type="range" min="0" max="3" value ="0" step="0.1" onchange="changeLightPos(1, this.value)" oninput="changeLightPos(1, this.value)" />
-        <p>Lumière 3</p>
-        <input type="checkbox" checked onchange="toggleLight(2)" />
-        <input type="range" min="0" max="3" value ="0" step="0.1" onchange="changeLightPos(2, this.value)" oninput="changeLightPos(2, this.value)" />
-        <p>Lumière 4</p>
-        <input type="checkbox" checked onchange="toggleLight(3)" />
-        <input type="range" min="0" max="3" value ="0" step="0.1" onchange="changeLightPos(3, this.value)" oninput="changeLightPos(3, this.value)" />
+        <br/>
+        <br/><h1>Gestion de la lumière</h1><br/>
+
+        <div class="light-div">
+          <input type="checkbox" checked onchange="toggleLight(0)" /> <span class="title">Spot premier plan</span> <br>
+          <span class="label">Position en Y : </span><input style="float: right; width:50%" type="range" min="0" max="3" value ="0" step="0.1" onchange="changeLightPos(0, this.value)" oninput="changeLightPos(0, this.value)"/>
+        </div>
+
+        <div class="light-div">
+          <input type="checkbox" checked onchange="toggleLight(1)" /> <span class="title">Spot de gauche</span> <br>
+          <span class="label">Position en Y : </span><input style="float: right; width:50%" type="range" min="0" max="3" value ="0" step="0.1" onchange="changeLightPos(1, this.value)" oninput="changeLightPos(1, this.value)"/>
+        </div>
+
+        <div class="light-div">
+          <input type="checkbox" checked onchange="toggleLight(2)" /> <span class="title">Spot arrière plan</span> <br>
+          <span class="label" >Position en Y : </span><input style="float: right; width:50%" type="range" min="0" max="3" value ="0" step="0.1" onchange="changeLightPos(2, this.value)" oninput="changeLightPos(2, this.value)"/>
+        </div>
+
+        <div class="light-div">
+          <input type="checkbox" checked onchange="toggleLight(3)" /> <span class="title">Spot de droite</span> <br>
+          <span class="label" >Position en Y : </span><input style="float: right; width:50%" type="range" min="0" max="3" value ="0" step="0.1" onchange="changeLightPos(3, this.value)" oninput="changeLightPos(3, this.value)"/>
+        </div>
+
       </div>
     </div>
   </body>
