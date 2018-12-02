@@ -1,5 +1,5 @@
 class SolidShape {
-  constructor(vertices, indices, colors, normals, center, color, numberVertices, numberIndices) {
+  constructor(vertices, indices, colors, normals, center, color, numberVertices) {
     this.vertices = vertices;
     this.indices = indices;
     this.colors = colors;
@@ -9,7 +9,7 @@ class SolidShape {
     this.indicesOffset = this.indices.length;
     this.colorsOffset = this.colors.length;
     this.numberVertices = numberVertices;
-    this.numberIndices = numberIndices;
+    this.numberIndices = numberVertices;
 
     this.center = center;
     this.speed, this.positionComparaisonError;
@@ -129,6 +129,36 @@ class SolidShape {
   }
 
   /**
+  * Scales the solid shape by the given ratio.
+  */
+  scale(ratio) {
+    let oldCenter = this.center;
+    this.move({x:0.0, y:0.0, z:0.0});
+
+    // retrieve solid's vertices
+    let oldVertices = this.vertices.slice(this.verticesOffset, this.verticesOffset+(this.numberVertices*3));
+    let newVertices = [];
+
+    // for each group of 3 values (forming a vertex)
+    for (let i=0; i<oldVertices.length; i+=3) {
+      // init vec3 vertex coords
+      let vertex = vec3.fromValues(oldVertices[i+0], oldVertices[i+1], oldVertices[i+2]);
+
+      // scale the vertex
+      vec3.scale(vertex, vertex, ratio);
+
+      // push the new coordinates
+      newVertices.push(vertex[0], vertex[1], vertex[2]);
+    }
+
+    // replace the old vertices by the new ones and move the solid back to its original position
+    this.vertices.splice.apply(this.vertices, [this.verticesOffset, this.numberVertices*3].concat(newVertices));
+    this.move(oldCenter);
+
+    this.setNormals(true);
+  }
+
+  /**
   * Changes the current solid shape's speed.
   */
   changeSpeed(newSpeed) {
@@ -162,7 +192,7 @@ class SolidShape {
     for (let i=0; i<allNormals.length; i++)
       this.normals.splice(this.verticesOffset + i, // index
                           hasBeenInitialized ? 1 : 0, // number of elements to remove before pushing
-                          allNormals[i]
+                          allNormals[i] // element to push
                         );
   }
 
@@ -177,7 +207,6 @@ class SolidShape {
     vNormal[2] = (v2[0] - v1[0]) * (v3[1] - v1[1])  -   (v2[1] - v1[1]) * (v3[0] - v1[0]);
 
     let norm = Math.sqrt(vNormal[0] * vNormal[0] + vNormal[1] * vNormal[1] + vNormal[2] * vNormal[2]);
-
     if(norm > 0.0) {
       vNormal[0] /= norm;
       vNormal[1] /= norm;
@@ -185,7 +214,7 @@ class SolidShape {
 
       return vNormal;
     } else {
-      console.log("Null vector");
+      // console.log("Null vector");
       return [0.0, 0.0, 0.0];
     }
   }

@@ -1,8 +1,7 @@
 class Tetrahedron extends SolidShape {
   constructor(vertices, indices, colors, normals, width=1.0, center={x:1.0, y:1.0, z:1.0}, color={r:1.0, g:1.0, b:1.0, a:1.0}) {
     super(vertices, indices, colors, normals, center, color,
-          12, // number of vertices
-          12  // number of indices
+          12 // number of vertices
          );
 
     this.width = width;
