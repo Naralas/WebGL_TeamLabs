@@ -31,11 +31,11 @@
       varying vec3 vLightRay[NB_LIGHTS];
       varying vec3 vEyeVec;
 
-      
+
     	void main(void) {
         gl_PointSize = 15.0;
         vColor = aColor;
-        
+
         vec4 vertex = uMVMatrix * vec4(aVertexPosition, 1.0);
         if (aVertexNormal != vec3(0.0,0.0,0.0))
         {
@@ -69,7 +69,7 @@
       varying vec3 vLightRay[NB_LIGHTS];
       varying vec3 vEyeVec;
       uniform bool uLightToggled[NB_LIGHTS];
-      
+
       vec3 phongShading()
 			{
         vec3 finalColor = vColor.rgb;
@@ -97,7 +97,7 @@
         }
 				return finalColor;
       }
-      
+
     	void main(void) {
         vec4 finalColor = vec4(vColor.rgb, 1.0);
 
@@ -168,7 +168,7 @@
 
       var lightEmitColorOn = {r: 1.0, g: 1.0, b: 1.0};
       var lightEmitColorOff = {r: 0.0, g: 0.0, b: 0.0};
-      
+
       var lightPositions = [];
       var lightToggled = [];
 
@@ -327,6 +327,19 @@
           solidShapes.push(new Tetrahedron(vertices, indices, colors, normals,
                                             width, {x: path[0][0], y: path[0][1], z: path[0][2]}, color
                                           ));
+           initBuffers();
+         } else
+          console.log("You can add at most " + maxNumberOfSolidShapes + " elements to the scene.");
+      }
+
+      /**
+      * Adds a new sphere to the scene on the path's origin.
+      */
+      function addSphere(width=0.5, color={r:1.0, g:1.0, b:1.0, a:1.0}) {
+        if (solidShapes.length < maxNumberOfSolidShapes) {
+          solidShapes.push(new Sphere(vertices, indices, colors, normals,
+                                        width, {x: path[0][0], y: path[0][1], z: path[0][2]}, color
+                                      ));
            initBuffers();
          } else
           console.log("You can add at most " + maxNumberOfSolidShapes + " elements to the scene.");
@@ -584,7 +597,7 @@
         margin-bottom: 10px;
         width: 350px;
       }
-      
+
       .title{
         line-height: 25px;
         font-weight: bold;

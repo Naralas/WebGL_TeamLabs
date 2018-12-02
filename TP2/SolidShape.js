@@ -17,10 +17,14 @@ class SolidShape {
     this.lastPathPoint = 0;
     this.color = color;
 
+    // avoid instantiation (abstract class)
     if (new.target === SolidShape)
       throw new TypeError("Cannot construct SolidShape instances directly.");
   }
 
+  /**
+  * Removes the solid shape from the scene (and thus from the shared arrays).
+  */
   delete() {
     this.vertices.splice(this.verticesOffset, this.numberVertices*3);
     this.indices.splice(this.indicesOffset, this.numberIndices);
@@ -28,6 +32,10 @@ class SolidShape {
     this.normals.splice(this.verticesOffset, this.numberVertices*3);
   }
 
+  /**
+  * Updates the shape's data offsets in the shared arrays (used when a solid shape is removed
+  * from the scene).
+  */
   updateOffsets(deltaVertices, deltaIndices, deltaColors) {
     this.verticesOffset -= deltaVertices;
     this.indicesOffset -= deltaIndices;
@@ -35,10 +43,34 @@ class SolidShape {
     this.setIndices(true);
   }
 
+  /**
+  * Abstract method. Should push the solid shape's vertices to the shared "vertices array" when
+  * implemented by a solid shape.
+  */
   setVertices() { throw new Error("This method must be implemented by derived classes."); }
-  setIndices() { throw new Error("This method must be implemented by derived classes."); }
-  setColors() { throw new Error("This method must be implemented by derived classes."); }
 
+  /**
+  * Pushes the solid shape's indices in the shared "indices array".
+  */
+  setIndices(hasBeenInitialized=false) {
+    for (let i=0; i<this.numberIndices; i++)
+      this.indices.splice(this.indicesOffset+i,       // index
+                          hasBeenInitialized ? 1 : 0, // number of elements to remove before pushing
+                          this.verticesOffset/3+i     // element to push
+                        );
+  }
+
+  /**
+  * Pushes the solid shape's colors in the shared "colors array".
+  */
+  setColors() {
+    for (let i=0; i<this.numberVertices; i++)
+      colors.push(this.color.r, this.color.g, this.color.b, this.color.a);
+  }
+
+  /**
+  * Moves the solid shape's to a given center (and thus moves each vertex).
+  */
   move(newCenter) {
     let oldCenter = this.center;
     this.center = newCenter;
@@ -56,6 +88,9 @@ class SolidShape {
     }
   }
 
+  /**
+  * Rotates the solid shape by a given angle around specified axes (and this rotates each vertex).
+  */
   rotate(angle, xAxis=true, yAxis=true, zAxis=true) {
     // translate the solid to origin
     let oldCenter = this.center;
@@ -74,7 +109,7 @@ class SolidShape {
       let viewMatrix = mat4.create();
       mat4.identity(viewMatrix);
 
-      // rotate the mat4 according to the given angle and axis
+      // rotate the mat4 according to the given angle and axes
       if(xAxis) mat4.rotate(viewMatrix, viewMatrix, degToRad(angle), [1.0, 0.0, 0.0]);
       if(yAxis) mat4.rotate(viewMatrix, viewMatrix, degToRad(angle), [0.0, 1.0, 0.0]);
       if(zAxis) mat4.rotate(viewMatrix, viewMatrix, degToRad(angle), [0.0, 0.0, 1.0]);
@@ -93,11 +128,18 @@ class SolidShape {
     this.setNormals(true);
   }
 
+  /**
+  * Changes the current solid shape's speed.
+  */
   changeSpeed(newSpeed) {
     this.speed = newSpeed;
     this.positionComparaisonError = 0.01 * this.speed;
   }
 
+  /**
+  * Sets the solid shape's normals and pushes them in the shared "normals array".
+  * Inspired from the example 5 from the chapter 8 of "Webgl ar la pratique".
+  */
   setNormals(hasBeenInitialized=false) {
     let allNormals = [];
     for(let i=0; i<this.numberVertices/3; i++) { // for each triangle
@@ -108,7 +150,7 @@ class SolidShape {
                      this.vertices[this.verticesOffset + (i*9+j) + 2]   // vertex's z
                   ]);
 
-      // finds triangle's normal and pushes it to the allNormals array once for each triangle's vertex
+      // finds triangle's normal and pushes it in the allNormals array once for each triangle's vertex
       let normalVec = this.findNormal(points[0], points[1], points[2]);
       allNormals.push(normalVec[0], normalVec[1], normalVec[2], // vertex1's normal
                       normalVec[0], normalVec[1], normalVec[2], // vertex2's normal
@@ -124,6 +166,9 @@ class SolidShape {
                         );
   }
 
+  /**
+  * Finds the normal of a triangle formed by the three given points.
+  */
   findNormal(v1, v2, v3) {
     let vNormal = [0.0, 0.0, 0.0];
 
