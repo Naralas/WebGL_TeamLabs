@@ -622,7 +622,6 @@
 
       <br/>
       <h2>todo :</h2>
-      - corriger le problème de style des boutons<br/>
       - corriger le shading de phong<br/>
       - écrire la "doc" :<br/>
         - expliquer le problème de lag avec les sphères<br/>
@@ -667,10 +666,8 @@
           <span class="label" >Position en Y : </span><input style="float: right; width:50%" type="range" min="0" max="3" value ="0" step="0.1" id="light4Position" onchange="changeLightPos(3, this.value)" oninput="changeLightPos(3, this.value)"/>
         </div>
 
-        <div class="light-div">
-          <input type="button" value="Inverser l'état de chaque spot" onclick="toggleAllLights()" style="font-size:15px; width: 130px; height: 65px; white-space: normal;" />
-          <input type="button" value="Réinitialiser la position de chaque spot" onclick="resetLightsPosition()" style="font-size:15px; width: 130px; height: 65px; white-space: normal;" />
-        </div>
+        <input type="button" value="Inverser l'état de chaque spot" onclick="toggleAllLights()" style="font-size:15px; width: 175px; height: 65px; white-space: normal;" />
+        <input type="button" value="Réinitialiser la position de chaque spot" onclick="resetLightsPosition()" style="font-size:15px; width: 175px; height: 65px; white-space: normal;" /><br/>
       </div>
     </div>
   </body>
