@@ -32,16 +32,16 @@
       varying vec3 vLightRay[NB_LIGHTS];
       varying vec3 vEyeVec;
 
-      
+
     	void main(void) {
         gl_PointSize = 15.0;
         vColor = aColor;
-        
+
         vec4 vertex = uMVMatrix * vec4(aVertexPosition, 1.0);
         if (aVertexNormal != vec3(0.0,0.0,0.0))
         {
           for(int i = 0; i < NB_LIGHTS; i++)
-            vLightRay[i] = vertex.xyz - uLightPositions[i]; 
+            vLightRay[i] = vertex.xyz - uLightPositions[i];
 
           vNormal = vec3(uNormalMatrix * vec4(aVertexNormal, 1.0));
           vEyeVec = -vec3(vertex.xyz);
@@ -70,7 +70,7 @@
       varying vec3 vLightRay[NB_LIGHTS];
       varying vec3 vEyeVec;
       uniform bool uLightToggled[NB_LIGHTS];
-      
+
       vec3 phongShading()
 			{
         vec3 finalColor = vColor.rgb * 0.3;
@@ -96,7 +96,7 @@
         }
 				return finalColor;
       }
-      
+
     	void main(void) {
         vec4 finalColor = vec4(vColor.rgb, 1.0);
 
@@ -107,6 +107,7 @@
         gl_FragColor = finalColor;
       }
     </script>
+
     <script>
       // buffers
       var vertexBuffer = null;
@@ -427,8 +428,10 @@
       * Toggles on and off the each scene's light.
       */
       function toggleAllLights() {
-        for (let i=0; i<4; i++)
+        for (let i=0; i<4; i++) {
           toggleLight(i);
+          document.getElementById("toggleLight" + (i+1)).checked = lightToggled[i] == 1;
+        }
       }
 
       /**
