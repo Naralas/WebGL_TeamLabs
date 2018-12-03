@@ -23,33 +23,27 @@
       uniform mat4 uMVMatrix;
       uniform mat4 uPMatrix;
       uniform mat4 uNormalMatrix;
-
-
-      uniform vec3 uLightPositions[NB_LIGHTS];
+      uniform vec3 uViewPos;
 
       varying vec4 vColor;
       varying vec3 vNormal;
-      varying vec3 vLightRay[NB_LIGHTS];
-      varying vec3 vEyeVec;
+      varying vec3 vFragPos;
+      varying vec3 vViewPos;
 
 
     	void main(void) {
         gl_PointSize = 15.0;
         vColor = aColor;
+        vViewPos = uViewPos;
+        vFragPos = aVertexPosition;
 
         vec4 vertex = uMVMatrix * vec4(aVertexPosition, 1.0);
-        if (aVertexNormal != vec3(0.0,0.0,0.0))
-        {
-          for(int i = 0; i < NB_LIGHTS; i++)
-            vLightRay[i] = vertex.xyz - uLightPositions[i];
-
+        if (aVertexNormal != vec3(0.0,0.0,0.0)) {
           vNormal = vec3(uNormalMatrix * vec4(aVertexNormal, 1.0));
-          vEyeVec = -vec3(vertex.xyz);
-        }
-        else
+        } else {
           vNormal = vec3(0.0, 0.0, 0.0);
-
-				gl_Position = uPMatrix * vertex;
+        }
+        gl_Position = uPMatrix * vertex;
   	  }
     </script>
 
@@ -60,51 +54,63 @@
       #endif
       #define NB_LIGHTS 4
 
-      varying vec4 vColor;
       varying vec3 vNormal;
+      varying vec4 vColor;
+      varying vec3 vFragPos;
+      varying vec3 vViewPos;
 
-      uniform vec3 uMaterialDiffuse;
-			uniform vec3 uMaterialSpecular;
-      uniform float uShininess;
+      uniform int uLightToggled[NB_LIGHTS];
+      uniform vec3 uLightPositions[NB_LIGHTS];
 
-      varying vec3 vLightRay[NB_LIGHTS];
-      varying vec3 vEyeVec;
-      uniform bool uLightToggled[NB_LIGHTS];
+      vec3 CalcPointLight(vec3 lightPos, vec3 normal, vec3 fragPos, vec3 viewDir, vec4 defaultColor) {
+        vec3 lightDir = normalize(lightPos - fragPos);
 
-      vec3 phongShading()
-			{
-        vec3 finalColor = vColor.rgb * 0.3;
+        // diffuse shading
+        float diff = max(dot(normal, lightDir), 0.0);
 
-        for(int i = 0; i < NB_LIGHTS; i++)
-        {
-          if(uLightToggled[i])
-          {
-            vec3 L = normalize(vLightRay[i]);
-            vec3 N = normalize(vNormal);
-            float lambertTerm = dot(N,-L);
+        // specular shading
+        vec3 reflectDir = reflect(-lightDir, normal);
+        float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
 
-            if(lambertTerm > 0.0)
-            {
-              finalColor += uMaterialDiffuse * lambertTerm;
-              vec3 E = normalize(vEyeVec);
-              vec3 R = reflect(L, N);
+        // attenuation
+        float distance    = length(lightPos - fragPos);
+        float attenuation = 1.0;// / (1.0 + 0.09 * distance + 0.032 * (distance * distance));
 
-              float specular = pow( max(dot(R, E), 0.0), uShininess);
-              finalColor += uMaterialSpecular * specular;
-            }
-          }
-        }
-				return finalColor;
+        // combine results
+        //defaultColor  = vec4(1.0, 1.0, 1.0, 1.0); // tmp
+        vec3 ambient  = vec3(0.05, 0.05, 0.05) * defaultColor.rgb;
+        vec3 diffuse  = vec3(0.8, 0.8, 0.8) * diff * defaultColor.rgb;
+        vec3 specular = vec3(1.0, 1.0, 1.0) * spec * defaultColor.rgb;
+
+        ambient  *= attenuation;
+        diffuse  *= attenuation;
+        specular *= attenuation;
+
+        return (ambient + diffuse + specular);
       }
 
-    	void main(void) {
-        vec4 finalColor = vec4(vColor.rgb, 1.0);
+      void main(void) {
+        vec4 defaultColor = vec4(vColor.rgb, 1.0);
 
-        if(vNormal != vec3(0.0, 0.0, 0.0))
-        {
-          finalColor = vec4(phongShading(), 1.0);
+        vec3 norm = normalize(vNormal);
+        vec3 viewDir = normalize(vViewPos - vFragPos);
+        vec3 result = vec3(0.0, 0.0, 0.0);
+
+        // if this isn't part of the curve
+        if(vNormal != vec3(0.0, 0.0, 0.0)) {
+          // compute the sub-color value for each enabled light
+          for(int i=0; i<NB_LIGHTS; i++) {
+            if (uLightToggled[i] == 1) {
+              //vec3 lightPos = vec3(0.0, 1.0, 0.0);
+              vec3 lightPos = uLightPositions[i];
+              result += CalcPointLight(lightPos, norm, vFragPos, viewDir, defaultColor);
+            }
+          }
+
+          gl_FragColor = vec4(result, 1.0);
+        } else {
+          gl_FragColor = defaultColor;
         }
-        gl_FragColor = finalColor;
       }
     </script>
 
@@ -124,7 +130,7 @@
       // camera
       var mvMatrix = mat4.create();
       var pMatrix = mat4.create();
-      var cameraPos = [4.0, -2.5, -6.0];
+      var cameraPos = [4.0, -2.5, -6.0]; // 0.0, -1.25, -7.0
 
       // scene
       var solidShapes = [];
@@ -147,11 +153,14 @@
       var lightColorOn = {r: 1.0, g: 1.0, b: 0.0, a: 1.0};
       var lightColorOff = {r: 0.0, g: 0.0, b: 0.0, a: 1.0};
 
-      var lightEmitColorOn = {r: 1.0, g: 1.0, b: 1.0};
+      var lightEmitColorOn = {r: 0.1, g: 0.1, b: 0.1};
       var lightEmitColorOff = {r: 0.0, g: 0.0, b: 0.0};
 
       var lightPositions = [];
       var lightToggled = [];
+
+      var minLightHeight = 0.3;
+      var maxLightHeight = 3.5;
 
       function initShaderParameters(prg) {
         prg.vertexPositionAttribute = glContext.getAttribLocation(prg, "aVertexPosition");
@@ -162,15 +171,12 @@
         glContext.enableVertexAttribArray(prg.vertexNormalAttribute);
         glContext.enableVertexAttribArray(prg.colorAttribute);
 
-        prg.pMatrixUniform  = glContext.getUniformLocation(prg, "uPMatrix");
-        prg.mvMatrixUniform = glContext.getUniformLocation(prg, "uMVMatrix");
-        prg.nUniform        = glContext.getUniformLocation(prg, "uNormalMatrix");
+        prg.pMatrixUniform        = glContext.getUniformLocation(prg, "uPMatrix");
+        prg.mvMatrixUniform       = glContext.getUniformLocation(prg, "uMVMatrix");
+        prg.nUniform              = glContext.getUniformLocation(prg, "uNormalMatrix");
         prg.lightPositionsUniform = glContext.getUniformLocation(prg, "uLightPositions");
-        prg.lightToggledUniform = glContext.getUniformLocation(prg, "uLightToggled");
-
-        prg.lightAmbientUniform        = glContext.getUniformLocation(prg, 'uLightAmbient');
-        prg.materialDiffuseUniform     = glContext.getUniformLocation(prg, 'uMaterialDiffuse');
-        prg.materialSpecularUniform    = glContext.getUniformLocation(prg, 'uMaterialSpecular');
+        prg.lightToggledUniform   = glContext.getUniformLocation(prg, "uLightToggled");
+        prg.viewPosUniform        = glContext.getUniformLocation(prg, "uViewPos");
       }
 
       function initBuffers() {
@@ -187,7 +193,7 @@
           // vec3.fromValues(0,0,0)) > 7)
           //   removeElement(solidShapes[i], i);
 
-          rotateElement(solidShapes[i], 1, true, true, true, false); // rotate 1 degree on each axis
+          rotateElement(solidShapes[i], 0.3, true, true, true, false); // rotate 1 degree on each axis
           moveAlongPath(solidShapes[i], performance.now() - lastTime, i); // move elements along the Bézier curve
         }
 
@@ -222,14 +228,14 @@
         glContext.uniformMatrix4fv(prg.pMatrixUniform, false, pMatrix);
         glContext.uniformMatrix4fv(prg.mvMatrixUniform, false, mvMatrix);
 
-        // set the lights position
+        // send the lights position
         glContext.uniform3fv(prg.lightPositionsUniform, lightPositions);
-        // set the lights toggled
+
+        // send the lights state
         glContext.uniform1iv(prg.lightToggledUniform, lightToggled);
 
-        glContext.uniform3f(prg.materialSpecularUniform, 0.5, 0.5, 0.5);
-        glContext.uniform3f(prg.materialDiffuseUniform, 0.6,0.6,0.6);
-        glContext.uniform1f(prg.shininessUniform, 24.0);
+        // send the camera's position
+        glContext.uniform3f(prg.viewPosUniform, cameraPos[0], cameraPos[1], cameraPos[2]);
 
         // normal matrix
         let normalMatrix = mat4.create();
@@ -264,10 +270,12 @@
       function initWebGL() {
         glContext = getGLContext("webgl-canvas");
         aspect = glContext.canvas.clientWidth / glContext.canvas.clientHeight;
-
         initProgram();
+
         initPath(35); // Initializes the path
         initStaticScene(); // Initializes the static scene
+        initLightsSliders();
+
         initBuffers();
         renderLoop();
       }
@@ -397,10 +405,10 @@
       * Changes the given light's position.
       */
       function changeLightPos(lightNumber, newPos) {
-        vertices[lightsVerticesOffset + lightNumber * 3 + 1] = newPos;
-        vertexBuffer  = getVertexBufferWithVertices(vertices);
+        vertices[lightsVerticesOffset + lightNumber * 3 + 1] = parseFloat(newPos);
+        vertexBuffer = getVertexBufferWithVertices(vertices);
 
-        lightPositions[lightNumber * 3 + 1] = newPos;
+        lightPositions[lightNumber * 3 + 1] = parseFloat(newPos);
       }
 
       /**
@@ -408,20 +416,16 @@
       */
       function toggleLight(lightNumber) {
         let offset = lightsColorsOffset + (lightNumber * 4);
-        let isOn = colors[offset + 0] == lightColorOn.r &&
-                   colors[offset + 1] == lightColorOn.g &&
-                   colors[offset + 2] == lightColorOn.b &&
-                   colors[offset + 3] == lightColorOn.a;
-        colors[offset + 0] = isOn ? lightColorOff.r : lightColorOn.r;
-        colors[offset + 1] = isOn ? lightColorOff.g : lightColorOn.g;
-        colors[offset + 2] = isOn ? lightColorOff.b : lightColorOn.b;
-        colors[offset + 3] = isOn ? lightColorOff.a : lightColorOn.a;
-        colorBuffer   = getVertexBufferWithVertices(colors);
 
-        if(lightToggled[lightNumber] == 0)
-          lightToggled[lightNumber] = 1;
-        else
-          lightToggled[lightNumber] = 0;
+        // change light's color
+        colors[offset + 0] = lightToggled[lightNumber] == 1 ? lightColorOff.r : lightColorOn.r;
+        colors[offset + 1] = lightToggled[lightNumber] == 1 ? lightColorOff.g : lightColorOn.g;
+        colors[offset + 2] = lightToggled[lightNumber] == 1 ? lightColorOff.b : lightColorOn.b;
+        colors[offset + 3] = lightToggled[lightNumber] == 1 ? lightColorOff.a : lightColorOn.a;
+        colorBuffer = getVertexBufferWithVertices(colors);
+
+        // toggle light's state
+        lightToggled[lightNumber] = lightToggled[lightNumber] == 0 ? 1 : 0;
       }
 
       /**
@@ -471,12 +475,12 @@
                     0.6, 0.6, 0.6, 1.0, // P4
                     0.6, 0.6, 0.6, 1.0  // P5
                   );
-        normals.push(0.0, 0.0, 0.0,
-                     0.0, 0.0, 0.0,
-                     0.0, 0.0, 0.0,
-                     0.0, 0.0, 0.0,
-                     0.0, 0.0, 0.0,
-                     0.0, 0.0, 0.0);
+        normals.push(0.0, 1.0, 0.0,
+                     0.0, 1.0, 0.0,
+                     0.0, 1.0, 0.0,
+                     0.0, 1.0, 0.0,
+                     0.0, 1.0, 0.0,
+                     0.0, 1.0, 0.0);
 
         // walls
         // let wallHeight = 5.0;
@@ -509,16 +513,16 @@
         lightsVerticesOffset = vertices.length;
         lightsColorsOffset = colors.length;
         let indicesOffset = indices.length;
-        vertices.push(groundCenter.x - groundSize.width/2, groundCenter.y, groundCenter.z + groundSize.depth/2, // P0
-                      groundCenter.x - groundSize.width/2, groundCenter.y, groundCenter.z - groundSize.depth/2, // P1
-                      groundCenter.x + groundSize.width/2, groundCenter.y, groundCenter.z - groundSize.depth/2, // P2
-                      groundCenter.x + groundSize.width/2, groundCenter.y, groundCenter.z + groundSize.depth/2  // P3
+        vertices.push(groundCenter.x - groundSize.width/2, minLightHeight, groundCenter.z + groundSize.depth/2, // P0
+                      groundCenter.x - groundSize.width/2, minLightHeight, groundCenter.z - groundSize.depth/2, // P1
+                      groundCenter.x + groundSize.width/2, minLightHeight, groundCenter.z - groundSize.depth/2, // P2
+                      groundCenter.x + groundSize.width/2, minLightHeight, groundCenter.z + groundSize.depth/2  // P3
                     );
-        lightPositions.push(groundCenter.x - groundSize.width/2, groundCenter.y, groundCenter.z + groundSize.depth/2, // P0
-                      groundCenter.x - groundSize.width/2, groundCenter.y, groundCenter.z - groundSize.depth/2, // P1
-                      groundCenter.x + groundSize.width/2, groundCenter.y, groundCenter.z - groundSize.depth/2, // P2
-                      groundCenter.x + groundSize.width/2, groundCenter.y, groundCenter.z + groundSize.depth/2  // P3
-                      );
+        lightPositions.push(groundCenter.x - groundSize.width/2, minLightHeight, groundCenter.z + groundSize.depth/2, // P0
+                            groundCenter.x - groundSize.width/2, minLightHeight, groundCenter.z - groundSize.depth/2, // P1
+                            groundCenter.x + groundSize.width/2, minLightHeight, groundCenter.z - groundSize.depth/2, // P2
+                            groundCenter.x + groundSize.width/2, minLightHeight, groundCenter.z + groundSize.depth/2  // P3
+                          );
         lightToggled.push(1,1,1,1);
 
 
@@ -557,7 +561,7 @@
         const inc = 1/numberIterations; // sets the delta for the Bézier curve
 
         for (let t=0; t<1; t+=inc) // computes cuve points
-          CastelJau(t, controlPoints, controlPoints.length);
+          castelJau(t, controlPoints, controlPoints.length);
         path.reverse();
 
         // adds points to webgl arrays
@@ -575,7 +579,7 @@
       * Castlejau implementation adapted from : http://fvirtman.free.fr/recueil/02_03_09_bezier.c.php
       * Used to create a Bézier curve with given control points.
       */
-      function CastelJau(t, controlPoints, nbPoints) {
+      function castelJau(t, controlPoints, nbPoints) {
         let subtab = [];
         if (nbPoints == 1) {
           path.push(controlPoints[0]);
@@ -585,7 +589,18 @@
           subtab.push(vec3.fromValues(t * controlPoints[i][0] + (1-t) * controlPoints[i+1][0],
                                       t * controlPoints[i][1] + (1-t) * controlPoints[i+1][1],
                                       t * controlPoints[i][2] + (1-t) * controlPoints[i+1][2]));
-        CastelJau(t, subtab, nbPoints-1);
+        castelJau(t, subtab, nbPoints-1);
+      }
+    
+      /**
+      * Initializes lights slides min, max and value.
+      */
+      function initLightsSliders() {
+        for (let i=0; i<4; i++) {
+          document.getElementById("light" + (i+1) + "Position").min = minLightHeight.toString();
+          document.getElementById("light" + (i+1) + "Position").max = maxLightHeight.toString();
+          document.getElementById("light" + (i+1) + "Position").value = lightPositions[(i*3)+1].toString();
+        }
       }
     </script>
 
@@ -613,15 +628,21 @@
   </head>
   <body onload="initWebGL()">
     <header>
-        <h1>&nbsp;Infographie, Labo 2 - ...<br></h1>
+        <h1>&nbsp;Infographie, Labo 2 - Animation de formes sur courbes de Bézier et éclairage<br></h1>
         <br>&nbsp;&nbsp;Équipe 6 : Chacun Guillaume, Graells Noah, Herbelin Ludovic<br>
-        <br>&nbsp;&nbsp;rendu le 27.11.18
+        <br>&nbsp;&nbsp;rendu le 04.12.18
     </header>
     <p>
-      Le but du laboratoire était de ...
+      Le but du laboratoire était de déplacer des formes sur des courbes de Bézier avec de l'éclairage. <br />
+      Nous avons choisi de placer 4 lumières sur la scène et de laisser l'utilisateur les allumer et éteindre et les déplacer en hauteur. <br />
 
+      Le code est séparé en plusieurs classes de formes, cela nous permet d'avoir un code plus séparé et d'instancier des formes facilement. <br />
+      Nous pourrions également rajouter d'autres types de formes relativement facilement sans toucher à la structure du code lié à WebGL. <br />
+      Nous avons choisi de travailler en mode de dessin "TRIANGLES" avec les mêmes buffers pour toutes les formes, nous pouvons ainsi dessiner toutes les formes d'un coup et profiter de la puissance parallèle des GPU. <br />
+      
       <br/>
       <h2>todo :</h2>
+      - corriger le problème de style des boutons<br/>
       - corriger le shading de phong<br/>
       - écrire la "doc" :<br/>
         - expliquer le problème de lag avec les sphères<br/>
@@ -645,29 +666,31 @@
         <div class="light-div">
           <input type="checkbox" checked onchange="toggleLight(0)" id="toggleLight1" />
           <span class="title"><label for="toggleLight1">Spot premier plan</label></span> <br>
-          <span class="label">Position en Y : </span><input style="float: right; width:50%" type="range" min="0" max="3" value ="0" step="0.1" id="light1Position" onchange="changeLightPos(0, this.value)" oninput="changeLightPos(0, this.value)"/>
+          <span class="label">Position en Y : </span><input style="float: right; width:50%" type="range" step="0.1" id="light1Position" onchange="changeLightPos(0, this.value)" oninput="changeLightPos(0, this.value)"/>
         </div>
 
         <div class="light-div">
           <input type="checkbox" checked onchange="toggleLight(1)" id="toggleLight2" />
           <span class="title"><label for="toggleLight2">Spot de gauche</label></span> <br>
-          <span class="label">Position en Y : </span><input style="float: right; width:50%" type="range" min="0" max="3" value ="0" step="0.1" id="light2Position" onchange="changeLightPos(1, this.value)" oninput="changeLightPos(1, this.value)"/>
+          <span class="label">Position en Y : </span><input style="float: right; width:50%" type="range" min=minLightHeight.toString() max=maxLightHeight.toString() value=lightPositions[1+1].toString() step="0.1" id="light2Position" onchange="changeLightPos(1, this.value)" oninput="changeLightPos(1, this.value)"/>
         </div>
 
         <div class="light-div">
           <input type="checkbox" checked onchange="toggleLight(2)" id="toggleLight3" />
           <span class="title"><label for="toggleLight3">Spot arrière p</label>lan</span> <br>
-          <span class="label" >Position en Y : </span><input style="float: right; width:50%" type="range" min="0" max="3" value ="0" step="0.1" id="light3Position" onchange="changeLightPos(2, this.value)" oninput="changeLightPos(2, this.value)"/>
+          <span class="label" >Position en Y : </span><input style="float: right; width:50%" type="range" min=minLightHeight.toString() max=maxLightHeight.toString() value=lightPositions[2+1].toString() step="0.1" id="light3Position" onchange="changeLightPos(2, this.value)" oninput="changeLightPos(2, this.value)"/>
         </div>
 
         <div class="light-div">
           <input type="checkbox" checked onchange="toggleLight(3)" id="toggleLight4" />
           <span class="title"><label for="toggleLight4">Spot de droite</label></span> <br>
-          <span class="label" >Position en Y : </span><input style="float: right; width:50%" type="range" min="0" max="3" value ="0" step="0.1" id="light4Position" onchange="changeLightPos(3, this.value)" oninput="changeLightPos(3, this.value)"/>
+          <span class="label" >Position en Y : </span><input style="float: right; width:50%" type="range" min=minLightHeight.toString() max=maxLightHeight.toString() value=lightPositions[3+1].toString() step="0.1" id="light4Position" onchange="changeLightPos(3, this.value)" oninput="changeLightPos(3, this.value)"/>
         </div>
 
         <input type="button" value="Inverser l'état de chaque spot" onclick="toggleAllLights()" style="font-size:15px; width: 175px; height: 65px; white-space: normal;" />
-        <input type="button" value="Réinitialiser la position de chaque spot" onclick="resetLightsPosition()" style="font-size:15px; width: 175px; height: 65px; white-space: normal;" /><br/>
+        <input type="button" value="Réinitialiser la position de chaque spot" onclick="resetLightsPosition()" style="font-size:15px; width: 175px; height: 65px; white-space: normal;" />
+        </br>
+
       </div>
     </div>
   </body>
