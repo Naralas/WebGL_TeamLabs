@@ -445,6 +445,24 @@
       }
 
       /**
+      * Toggles on and off the each scene's light.
+      */
+      function toggleAllLights() {
+        for (let i=0; i<4; i++)
+          toggleLight(i);
+      }
+
+      /**
+      * Resets each scene's light position.
+      */
+      function resetLightsPosition() {
+        for (let i=0; i<4; i++) {
+          changeLightPos(i, 0);
+          document.getElementById("light" + (i+1) + "Position").value = 0;
+        }
+      }
+
+      /**
       * Initializes the static objects on the scene.
       */
       function initStaticScene() {
@@ -619,6 +637,14 @@
     </header>
     <p>
       Le but du laboratoire était de ...
+
+      <br/>
+      <h2>todo :</h2>
+      - corriger le problème de style des boutons<br/>
+      - corriger le shading de phong<br/>
+      - écrire la "doc" :<br/>
+        - expliquer le problème de lag avec les sphères<br/>
+        - expliquer pourquoi on a fait ces classes (séparation du code, pour dessiner toutes les formes d'un coup et profiter de la parallélisation effectuée par le GPU -> au lieu de dessiner les formes une par une)<br/>
     </p>
     <canvas id="webgl-canvas" width="800" height="600">
       HTML5 is not supported
@@ -627,7 +653,7 @@
 
     <div id="control-panel">
       <div class="user-input">
-        <h1>Ajout de forme</h1><br/>
+        <h1>Ajout de formes</h1><br/>
         <input type="button" value="Ajouter un cube" onclick="addCube(0.4, {r: 1.0, g: 0.0, b: 0.0, a: 0.8})" style="font-size:15px; width: 100px; height: 65px; white-space: normal;"/>
         <input type="button" value="Ajouter un tétraèdre" onclick="addTetrahedron(0.4, {r: 0.0, g: 1.0, b: 0.0, a: 0.8})" style="font-size:15px; width:100px; height: 65px; white-space: normal;" />
         <input type="button" value="Ajouter une sphère" onclick="addSphere(0.3, {r: 0.0, g: 1.0, b: 1.0, a: 0.8})" style="font-size:15px; width:100px; height: 65px; white-space: normal;" />
@@ -638,27 +664,31 @@
         <div class="light-div">
           <input type="checkbox" checked onchange="toggleLight(0)" id="toggleLight1" />
           <span class="title"><label for="toggleLight1">Spot premier plan</label></span> <br>
-          <span class="label">Position en Y : </span><input style="float: right; width:50%" type="range" min="0" max="3" value ="0" step="0.1" onchange="changeLightPos(0, this.value)" oninput="changeLightPos(0, this.value)"/>
+          <span class="label">Position en Y : </span><input style="float: right; width:50%" type="range" min="0" max="3" value ="0" step="0.1" id="light1Position" onchange="changeLightPos(0, this.value)" oninput="changeLightPos(0, this.value)"/>
         </div>
 
         <div class="light-div">
           <input type="checkbox" checked onchange="toggleLight(1)" id="toggleLight2" />
           <span class="title"><label for="toggleLight2">Spot de gauche</label></span> <br>
-          <span class="label">Position en Y : </span><input style="float: right; width:50%" type="range" min="0" max="3" value ="0" step="0.1" onchange="changeLightPos(1, this.value)" oninput="changeLightPos(1, this.value)"/>
+          <span class="label">Position en Y : </span><input style="float: right; width:50%" type="range" min="0" max="3" value ="0" step="0.1" id="light2Position" onchange="changeLightPos(1, this.value)" oninput="changeLightPos(1, this.value)"/>
         </div>
 
         <div class="light-div">
           <input type="checkbox" checked onchange="toggleLight(2)" id="toggleLight3" />
           <span class="title"><label for="toggleLight3">Spot arrière p</label>lan</span> <br>
-          <span class="label" >Position en Y : </span><input style="float: right; width:50%" type="range" min="0" max="3" value ="0" step="0.1" onchange="changeLightPos(2, this.value)" oninput="changeLightPos(2, this.value)"/>
+          <span class="label" >Position en Y : </span><input style="float: right; width:50%" type="range" min="0" max="3" value ="0" step="0.1" id="light3Position" onchange="changeLightPos(2, this.value)" oninput="changeLightPos(2, this.value)"/>
         </div>
 
         <div class="light-div">
           <input type="checkbox" checked onchange="toggleLight(3)" id="toggleLight4" />
           <span class="title"><label for="toggleLight4">Spot de droite</label></span> <br>
-          <span class="label" >Position en Y : </span><input style="float: right; width:50%" type="range" min="0" max="3" value ="0" step="0.1" onchange="changeLightPos(3, this.value)" oninput="changeLightPos(3, this.value)"/>
+          <span class="label" >Position en Y : </span><input style="float: right; width:50%" type="range" min="0" max="3" value ="0" step="0.1" id="light4Position" onchange="changeLightPos(3, this.value)" oninput="changeLightPos(3, this.value)"/>
         </div>
 
+        <div class="light-div">
+          <input type="button" value="Inverser l'état de chaque spot" onclick="toggleAllLights()" style="font-size:15px; width: 130px; height: 65px; white-space: normal;" />
+          <input type="button" value="Réinitialiser la position de chaque spot" onclick="resetLightsPosition()" style="font-size:15px; width: 130px; height: 65px; white-space: normal;" />
+        </div>
       </div>
     </div>
   </body>
