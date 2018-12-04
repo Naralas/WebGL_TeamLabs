@@ -154,8 +154,6 @@ class SolidShape {
     // replace the old vertices by the new ones and move the solid back to its original position
     this.vertices.splice.apply(this.vertices, [this.verticesOffset, this.numberVertices*3].concat(newVertices));
     this.move(oldCenter);
-
-    this.setNormals(true);
   }
 
   /**
@@ -188,11 +186,17 @@ class SolidShape {
                     );
     }
 
-    // push normals components one by one in the shared normals array
-    for (let i=0; i<allNormals.length; i++)
+    this.pushNormals(allNormals, hasBeenInitialized);
+  }
+
+  /**
+  * Pushes normals components one by one in the shared normals array
+  */
+  pushNormals(normals, hasBeenInitialized=false) {
+    for (let i=0; i<normals.length; i++)
       this.normals.splice(this.verticesOffset + i, // index
                           hasBeenInitialized ? 1 : 0, // number of elements to remove before pushing
-                          allNormals[i] // element to push
+                          normals[i] // element to push
                         );
   }
 

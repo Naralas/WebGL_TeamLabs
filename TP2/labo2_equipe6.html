@@ -6,44 +6,51 @@
     <script src="./js/commonFunctions.js"></script>
     <script src="./js/gl-matrix-min.js"></script>
     <script src="./js/webglTools.js"></script>
+		<script src="js/OBJ_loader.js"></script>
 
     <script src="./SolidShape.js"></script>
     <script src="./Cube.js"></script>
     <script src="./Tetrahedron.js"></script>
     <script src="./Sphere.js"></script>
+    <script src="./ImportedModel.js"></script>
 
     <!-- Vertex Shader -->
     <script id="shader-vs" type="x-shader/x-vertex">
       #define NB_LIGHTS 4
 
+      // vertex's attributes
       attribute vec3 aVertexPosition;
       attribute vec3 aVertexNormal;
       attribute vec4 aColor;
 
+      // uniform variables
       uniform mat4 uMVMatrix;
       uniform mat4 uPMatrix;
       uniform mat4 uNormalMatrix;
       uniform vec3 uViewPos;
 
-      varying vec4 vColor;
-      varying vec3 vNormal;
-      varying vec3 vFragPos;
-      varying vec3 vViewPos;
+      // varying variables
+      varying vec4 vColor;   // vertex's color
+      varying vec3 vNormal;  // vertex's normal
+      varying vec3 vFragPos; // vertex's position
+      varying vec3 vViewPos; // camera position
 
 
     	void main(void) {
-        gl_PointSize = 15.0;
+        gl_PointSize = 15.0; // to display the lights
         vColor = aColor;
         vViewPos = uViewPos;
         vFragPos = aVertexPosition;
 
-        vec4 vertex = uMVMatrix * vec4(aVertexPosition, 1.0);
+        // compute vertex's normal
         if (aVertexNormal != vec3(0.0,0.0,0.0)) {
           vNormal = vec3(uNormalMatrix * vec4(aVertexNormal, 1.0));
         } else {
           vNormal = vec3(0.0, 0.0, 0.0);
         }
-        gl_Position = uPMatrix * vertex;
+
+        // compute vertex's position in camera coordinates system
+        gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
   	  }
     </script>
 
@@ -54,38 +61,53 @@
       #endif
       #define NB_LIGHTS 4
 
-      varying vec3 vNormal;
-      varying vec4 vColor;
-      varying vec3 vFragPos;
-      varying vec3 vViewPos;
+      // adapted from https://learnopengl.com/
 
-      uniform int uLightToggled[NB_LIGHTS];
-      uniform vec3 uLightPositions[NB_LIGHTS];
+      varying vec3 vNormal;  // vertex's normal
+      varying vec4 vColor;   // vertex's color
+      varying vec3 vFragPos; // vertex's position (world coordinates)
+      varying vec3 vViewPos; // camera's position (world coordinates)
 
-      vec3 CalcPointLight(vec3 lightPos, vec3 normal, vec3 fragPos, vec3 viewDir, vec4 defaultColor) {
-        vec3 lightDir = normalize(lightPos - fragPos);
+      uniform int uLightToggled[NB_LIGHTS];    // each light's position
+      uniform vec3 uLightPositions[NB_LIGHTS]; // each light's state
+
+      // lights constants parameters
+      float materialShininess = 32.0;
+      float lightConstant = 1.0;   // used to compute light's attenuation
+      float lightLinear = 0.09;    // used to compute light's attenuation
+      float lightQuadratic = 0.01; // used to compute light's attenuation
+      vec3 lightAmbient = vec3(0.05, 0.05, 0.05);
+      vec3 lightDifuse = vec3(0.8, 0.8, 0.8);
+      vec3 lightSpecular = vec3(1.0, 1.0, 1.0);
+
+      /*
+      * Computes the final color of a fragment according to a specific point light.
+      */
+      vec3 calcPointLight(vec3 lightPos, vec3 normal, vec3 fragPos, vec3 viewDir, vec4 defaultColor) {
+        vec3 lightDir = normalize(lightPos - fragPos); // light's direction
 
         // diffuse shading
         float diff = max(dot(normal, lightDir), 0.0);
 
         // specular shading
         vec3 reflectDir = reflect(-lightDir, normal);
-        float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
+        float spec = pow(max(dot(viewDir, reflectDir), 0.0), materialShininess);
 
         // attenuation
         float distance    = length(lightPos - fragPos);
-        float attenuation = 1.0;// / (1.0 + 0.09 * distance + 0.032 * (distance * distance));
+        float attenuation = 1.0 / (lightConstant + lightLinear * distance + lightQuadratic * (distance * distance));
 
         // combine results
-        //defaultColor  = vec4(1.0, 1.0, 1.0, 1.0); // tmp
-        vec3 ambient  = vec3(0.05, 0.05, 0.05) * defaultColor.rgb;
-        vec3 diffuse  = vec3(0.8, 0.8, 0.8) * diff * defaultColor.rgb;
-        vec3 specular = vec3(1.0, 1.0, 1.0) * spec * defaultColor.rgb;
+        vec3 ambient  = lightAmbient * defaultColor.rgb;
+        vec3 diffuse  = lightDifuse * diff * defaultColor.rgb;
+        vec3 specular = lightSpecular * spec * defaultColor.rgb;
 
+        // apply attenuation
         ambient  *= attenuation;
         diffuse  *= attenuation;
         specular *= attenuation;
 
+        // return combined light's effects
         return (ambient + diffuse + specular);
       }
 
@@ -103,7 +125,7 @@
             if (uLightToggled[i] == 1) {
               //vec3 lightPos = vec3(0.0, 1.0, 0.0);
               vec3 lightPos = uLightPositions[i];
-              result += CalcPointLight(lightPos, norm, vFragPos, viewDir, defaultColor);
+              result += calcPointLight(lightPos, norm, vFragPos, viewDir, defaultColor);
             }
           }
 
@@ -130,14 +152,16 @@
       // camera
       var mvMatrix = mat4.create();
       var pMatrix = mat4.create();
-      var cameraPos = [4.0, -2.5, -6.0]; // 0.0, -1.25, -7.0
+      var cameraPos = [4.0, -2.5, -6.0];
 
       // scene
       var solidShapes = [];
       var path = [];
       var drawPath = true;
       var lastTime = performance.now();
-      var maxNumberOfSolidShapes = 100;
+      const maxNumberOfSolidShapes = 100;
+      var nbImportedModels = 0;
+      const maxNumberImportedModels = 15;
       var frameCount = 0;
       var elapsedTime = 0;
 
@@ -150,18 +174,28 @@
       // lights
       var lightsVerticesOffset = 0;
       var lightsColorsOffset = 0;
-      var lightColorOn = {r: 1.0, g: 1.0, b: 0.0, a: 1.0};
-      var lightColorOff = {r: 0.0, g: 0.0, b: 0.0, a: 1.0};
+      const lightColorOn = {r: 1.0, g: 1.0, b: 0.0, a: 1.0};
+      const lightColorOff = {r: 0.0, g: 0.0, b: 0.0, a: 1.0};
 
-      var lightEmitColorOn = {r: 0.1, g: 0.1, b: 0.1};
-      var lightEmitColorOff = {r: 0.0, g: 0.0, b: 0.0};
+      const lightEmitColorOn = {r: 0.1, g: 0.1, b: 0.1};
+      const lightEmitColorOff = {r: 0.0, g: 0.0, b: 0.0};
 
       var lightPositions = [];
       var lightToggled = [];
 
-      var minLightHeight = 0.3;
-      var maxLightHeight = 3.5;
+      const minLightHeight = 0.3;
+      const maxLightHeight = 3.5;
 
+      // cooldown to add objects
+      var currCooldownAddObject = 0;
+      const cooldownAddObject = 500;
+
+      // models
+      var importedModels = [];
+
+      /**
+      * Creates the "bridges" between JS and the GLSL program (shaders) "prg".
+      */
       function initShaderParameters(prg) {
         prg.vertexPositionAttribute = glContext.getAttribLocation(prg, "aVertexPosition");
         prg.vertexNormalAttribute   = glContext.getAttribLocation(prg, "aVertexNormal");
@@ -179,6 +213,9 @@
         prg.viewPosUniform        = glContext.getUniformLocation(prg, "uViewPos");
       }
 
+      /**
+      * Buffers initialization to send vertices and index data to the shaders.
+      */
       function initBuffers() {
         vertexBuffer  = getVertexBufferWithVertices(vertices);
         normalBuffer  = getVertexBufferWithVertices(normals);
@@ -186,14 +223,17 @@
         indexBuffer   = getIndexBufferWithIndices(indices);
       }
 
+      /**
+      * Draws and initializes the scene.
+      */
       function drawScene() {
         // for each solid shape, rotate and move it as long as its on the path
         for (let i=solidShapes.length-1; i>=0; i--) {
-          // if (vec3.distance(vec3.fromValues(solidShapes[i].center.x, solidShapes[i].center.y, solidShapes[i].center.z),
-          // vec3.fromValues(0,0,0)) > 7)
-          //   removeElement(solidShapes[i], i);
+          if (vec3.distance(vec3.fromValues(solidShapes[i].center.x, solidShapes[i].center.y, solidShapes[i].center.z), vec3.fromValues(0,0,0)) > 7)
+            removeElement(solidShapes[i], i);
 
-          rotateElement(solidShapes[i], 0.3, true, true, true, false); // rotate 1 degree on each axis
+          if (!ImportedModel.prototype.isPrototypeOf(solidShapes[i])) // desable rotations for imported models to avoid perfomance loss
+            rotateElement(solidShapes[i], 0.3, true, true, true, false); // rotate 1 degree on each axis
           moveAlongPath(solidShapes[i], performance.now() - lastTime, i); // move elements along the Bézier curve
         }
 
@@ -205,10 +245,17 @@
 
         // draw fps
         drawFps();
+
+        // draw cooldown
+        if (currCooldownAddObject > 0) {
+          currCooldownAddObject -= performance.now() - lastTime;
+          handleBtnCooldown();
+        }
+
         lastTime = performance.now();
 
         // init scene
-        glContext.clearColor(0.15, 0.15, 0.15, 1.0);
+        glContext.clearColor(0.0, 0.0, 0.0, 1.0);
         glContext.enable(glContext.DEPTH_TEST);
         glContext.clear(glContext.COLOR_BUFFER_BIT | glContext.DEPTH_BUFFER_BIT);
         glContext.viewport(0, 0, c_width, c_height);
@@ -267,17 +314,61 @@
         }
       }
 
+      /**
+      * Initializes the webgl program.
+      */
       function initWebGL() {
         glContext = getGLContext("webgl-canvas");
         aspect = glContext.canvas.clientWidth / glContext.canvas.clientHeight;
         initProgram();
 
+        // intialize scene ahd DOM
         initPath(35); // Initializes the path
         initStaticScene(); // Initializes the static scene
         initLightsSliders();
+        displayAvailableComplexObjects();
+        displayAvailableSimpleObjects();
 
+        // load external models
+        loadModel("models/sphere.obj");
+
+        // start webgl application
         initBuffers();
         renderLoop();
+      }
+
+      /**
+      * Handles button add complex object cooldown.
+      */
+      function handleBtnCooldown() {
+        if (currCooldownAddObject > 0) {
+          document.getElementById("btnAddSphere").disabled = true;
+          let s = Math.round((currCooldownAddObject / 1000) * 100) / 100;
+          document.getElementById("btnAddSphereInfo").innerHTML = "(" + s + " s)";
+        } else {
+          document.getElementById("btnAddSphere").disabled = false;
+          document.getElementById("btnAddSphereInfo").innerHTML = "";
+          displayAvailableComplexObjects();
+        }
+      }
+
+      /**
+      * Displays available number of complex objects to add to the scene.
+      */
+      function displayAvailableComplexObjects() {
+        document.getElementById("btnAddSphereInfo").innerHTML = "(" + (maxNumberImportedModels-nbImportedModels) + " disponibles)";
+        document.getElementById("btnAddSphere").disabled = maxNumberImportedModels-nbImportedModels <= 0 && maxNumberOfSolidShapes-solidShapes.length;
+      }
+
+      /**
+      * Display available solid shapes to add to the scene.
+      */
+      function displayAvailableSimpleObjects() {
+        document.getElementById("btnAddCubeInfo").innerHTML = "(" + (maxNumberOfSolidShapes-solidShapes.length) + " disponibles)";
+        document.getElementById("btnAddTetrahedronInfo").innerHTML = "(" + (maxNumberOfSolidShapes-solidShapes.length) + " disponibles)";
+        document.getElementById("btnAddCube").disabled = maxNumberOfSolidShapes-solidShapes.length <= 0;
+        document.getElementById("btnAddTetrahedron").disabled = maxNumberOfSolidShapes-solidShapes.length <= 0;
+        document.getElementById("btnAddSphere").disabled = maxNumberImportedModels-nbImportedModels <= 0 && maxNumberOfSolidShapes-solidShapes.length <= 0;
       }
 
       /**
@@ -303,6 +394,7 @@
           solidShapes.push(new Cube(vertices, indices, colors, normals,
                                      width, {x: path[0][0], y: path[0][1], z: path[0][2]}, color
                                    ));
+          displayAvailableSimpleObjects();
           initBuffers();
         } else
          console.log("You can add at most " + maxNumberOfSolidShapes + " elements to the scene.");
@@ -316,7 +408,8 @@
           solidShapes.push(new Tetrahedron(vertices, indices, colors, normals,
                                             width, {x: path[0][0], y: path[0][1], z: path[0][2]}, color
                                           ));
-           initBuffers();
+          displayAvailableSimpleObjects();
+          initBuffers();
          } else
           console.log("You can add at most " + maxNumberOfSolidShapes + " elements to the scene.");
       }
@@ -326,10 +419,27 @@
       */
       function addSphere(width=0.5, color={r:1.0, g:1.0, b:1.0, a:1.0}) {
         if (solidShapes.length < maxNumberOfSolidShapes) {
-          solidShapes.push(new Sphere(vertices, indices, colors, normals,
-                                        width, {x: path[0][0], y: path[0][1], z: path[0][2]}, color
+          if (nbImportedModels < maxNumberImportedModels) {
+            nbImportedModels++;
+            displayAvailableComplexObjects();
+            addImportedModel(importedModels[0].finalVertices, importedModels[0].finalNormals, 0.2, {r:0.0, g:1.0, b:1.0, a:1.0});
+          } else
+            console.log("You can add at most " + maxNumberImportedModels + " complicated models to the scene.");
+        } else
+          console.log("You can add at most " + maxNumberOfSolidShapes + " elements to the scene.");
+      }
+
+      /**
+      * Adds a new imported model to the scene on the path's origin.
+      */
+      function addImportedModel(presetVertices, presetNormals, ratioSize=0.5, color={r:1.0, g:1.0, b:1.0, a:1.0}) {
+        if (solidShapes.length < maxNumberOfSolidShapes && currCooldownAddObject <= 0) {
+          solidShapes.push(new ImportedModel(vertices, indices, colors, normals, presetVertices, presetNormals,
+                                        ratioSize, {x: path[0][0], y: path[0][1], z: path[0][2]}, color
                                       ));
-           initBuffers();
+          currCooldownAddObject = cooldownAddObject;
+          displayAvailableSimpleObjects();
+          initBuffers();
          } else
           console.log("You can add at most " + maxNumberOfSolidShapes + " elements to the scene.");
       }
@@ -359,12 +469,17 @@
       * and the solidShapes array. Updates the offsets of each remaining solid shape.
       */
       function removeElement(solidShape, index) {
+        if (ImportedModel.prototype.isPrototypeOf(solidShape)) {
+          nbImportedModels--;
+          displayAvailableComplexObjects();
+        }
         solidShape.delete(); // removes the shape's values from the shared arrays (vertices, indices, colors)
         for (let i=index+1; i<solidShapes.length; i++) // updates each remaining solid shape's offsets in shared arrays
-          solidShapes[i].updateOffsets(solidShapes[index].numberVertices*3,
-                                       solidShapes[index].numberIndices,
-                                       solidShapes[index].numberVertices*4);
+        solidShapes[i].updateOffsets(solidShapes[index].numberVertices*3,
+        solidShapes[index].numberIndices,
+        solidShapes[index].numberVertices*4);
         solidShapes.splice(index, 1); // remove the solid shape from the solidShapes array
+        displayAvailableSimpleObjects();
         initBuffers();
       }
 
@@ -426,6 +541,9 @@
 
         // toggle light's state
         lightToggled[lightNumber] = lightToggled[lightNumber] == 0 ? 1 : 0;
+
+        // toggle light's html representation
+        document.getElementById("light" + (lightNumber+1) + "Representation").style.backgroundColor = lightToggled[lightNumber] == 1 ? "yellow" : "black";
       }
 
       /**
@@ -443,8 +561,8 @@
       */
       function resetLightsPosition() {
         for (let i=0; i<4; i++) {
-          changeLightPos(i, 0);
-          document.getElementById("light" + (i+1) + "Position").value = 0;
+          changeLightPos(i, minLightHeight);
+          document.getElementById("light" + (i+1) + "Position").value = minLightHeight;
         }
       }
 
@@ -453,9 +571,9 @@
       */
       function initStaticScene() {
         let groundCenter = {x: 0.0, y: 0.0, z: 0.0};
-        let groundSize = {width: 5.0, depth: 5.0};
+        let groundSize = {width: 5.5, depth: 5.5};
 
-        initSceneLights(groundCenter, groundSize);
+        initSceneLights();
 
         let indicesOffset = indices.length;
         // ground
@@ -509,34 +627,42 @@
       /**
       * Initializes the static lights objects on the scene.
       */
-      function initSceneLights(groundCenter, groundSize) {
+      function initSceneLights() {
+        let lightRectangleCenter = {x: 0.0, y: 0.0, z: 0.0};
+        let lightRectangleSize = {width: 5.0, depth: 5.0};
+
         lightsVerticesOffset = vertices.length;
         lightsColorsOffset = colors.length;
         let indicesOffset = indices.length;
-        vertices.push(groundCenter.x - groundSize.width/2, minLightHeight, groundCenter.z + groundSize.depth/2, // P0
-                      groundCenter.x - groundSize.width/2, minLightHeight, groundCenter.z - groundSize.depth/2, // P1
-                      groundCenter.x + groundSize.width/2, minLightHeight, groundCenter.z - groundSize.depth/2, // P2
-                      groundCenter.x + groundSize.width/2, minLightHeight, groundCenter.z + groundSize.depth/2  // P3
+        vertices.push(lightRectangleCenter.x - lightRectangleSize.width/2, minLightHeight, lightRectangleCenter.z + lightRectangleSize.depth/2, // P0
+                      lightRectangleCenter.x - lightRectangleSize.width/2, minLightHeight, lightRectangleCenter.z - lightRectangleSize.depth/2, // P1
+                      lightRectangleCenter.x + lightRectangleSize.width/2, minLightHeight, lightRectangleCenter.z - lightRectangleSize.depth/2, // P2
+                      lightRectangleCenter.x + lightRectangleSize.width/2, minLightHeight, lightRectangleCenter.z + lightRectangleSize.depth/2  // P3
                     );
-        lightPositions.push(groundCenter.x - groundSize.width/2, minLightHeight, groundCenter.z + groundSize.depth/2, // P0
-                            groundCenter.x - groundSize.width/2, minLightHeight, groundCenter.z - groundSize.depth/2, // P1
-                            groundCenter.x + groundSize.width/2, minLightHeight, groundCenter.z - groundSize.depth/2, // P2
-                            groundCenter.x + groundSize.width/2, minLightHeight, groundCenter.z + groundSize.depth/2  // P3
+        lightPositions.push(lightRectangleCenter.x - lightRectangleSize.width/2, minLightHeight, lightRectangleCenter.z + lightRectangleSize.depth/2, // P0
+                            lightRectangleCenter.x - lightRectangleSize.width/2, minLightHeight, lightRectangleCenter.z - lightRectangleSize.depth/2, // P1
+                            lightRectangleCenter.x + lightRectangleSize.width/2, minLightHeight, lightRectangleCenter.z - lightRectangleSize.depth/2, // P2
+                            lightRectangleCenter.x + lightRectangleSize.width/2, minLightHeight, lightRectangleCenter.z + lightRectangleSize.depth/2  // P3
                           );
         lightToggled.push(1,1,1,1);
 
 
         indices.push(indicesOffset+0, indicesOffset+1, indicesOffset+2, indicesOffset+3);
-        colors.push(1.0, 1.0, 0.0, 1.0, // P0
-                    1.0, 1.0, 0.0, 1.0, // P1
-                    1.0, 1.0, 0.0, 1.0, // P2
-                    1.0, 1.0, 0.0, 1.0  // P3
+        colors.push(lightColorOn.r, lightColorOn.g, lightColorOn.b, lightColorOn.a,  // P0
+                    lightColorOn.r, lightColorOn.g, lightColorOn.b, lightColorOn.a,  // P1
+                    lightColorOn.r, lightColorOn.g, lightColorOn.b, lightColorOn.a,  // P2
+                    lightColorOn.r, lightColorOn.g, lightColorOn.b, lightColorOn.a,  // P3
                   );
         normals.push(0.0, 0.0, 0.0,
                      0.0, 0.0, 0.0,
                      0.0, 0.0, 0.0,
                      0.0, 0.0, 0.0
                    );
+
+        toggleLight(0);toggleLight(0);
+        toggleLight(1);
+        toggleLight(2);
+        toggleLight(3);
       }
 
       /**
@@ -591,7 +717,7 @@
                                       t * controlPoints[i][2] + (1-t) * controlPoints[i+1][2]));
         castelJau(t, subtab, nbPoints-1);
       }
-    
+
       /**
       * Initializes lights slides min, max and value.
       */
@@ -602,6 +728,56 @@
           document.getElementById("light" + (i+1) + "Position").value = lightPositions[(i*3)+1].toString();
         }
       }
+
+      /**
+      * Creates an object from the loaded wavefrom model.
+      * Adapted code from book "WebGL par la pratique".
+      */
+      function handleOBJModel(filename, data){
+        let objData = new OBJ.Mesh(data);
+
+        let finalVertices = [];
+        let finalNormals = [];
+
+        // convert imported object geometry to our format
+        for (let i=0; i<objData.indices.length; i++) {
+          finalVertices.push(parseFloat(objData.vertices[objData.indices[i]*3 + 0]),
+                             parseFloat(objData.vertices[objData.indices[i]*3 + 1]),
+                             parseFloat(objData.vertices[objData.indices[i]*3 + 2]));
+          finalNormals.push(parseFloat(objData.vertexNormals[objData.indices[i]*3 + 0]),
+                            parseFloat(objData.vertexNormals[objData.indices[i]*3 + 1]),
+                            parseFloat(objData.vertexNormals[objData.indices[i]*3 + 2]));
+        }
+
+        if (finalVertices.length > 0 && finalNormals.length > 0)
+          importedModels.push({name: "sphere", finalVertices: finalVertices, finalNormals: finalNormals});
+        document.getElementById("btnAddSphere").disabled = importedModels.length <= 0;
+      }
+
+      /**
+      * Loads given model from filename.
+      * Code from book "WebGL par la pratique".
+      */
+      function loadModel(filename) {
+        let request = new XMLHttpRequest();
+        request.open("GET", filename);
+        request.onreadystatechange = function() {
+          if (request.readyState == 4) {
+            if(request.status == 404)
+              console.info(filename + ' does not exist');
+            else {
+              let re = /(?:\.([^./]+))?$/;
+              let ext = re.exec(filename)[1];
+              if (ext == "obj")
+                handleOBJModel(filename, request.responseText);
+              else
+                console.info("unknown format extension: " + ext );
+            }
+          }
+        }
+        request.send();
+      }
+
     </script>
 
     <style>
@@ -623,75 +799,101 @@
         line-height: 25px;
         margin-left: 25px;
       }
+
+      .lightRepresentation-div {
+        width: 20px;
+        height: 20px;
+        display: inline-block;
+        float: left;
+        border-radius: 2px;
+        border: 1px solid lightgray;
+      }
+
+      .lightRepresentation-div:hover {
+        cursor: pointer;
+      }
     </style>
 
   </head>
   <body onload="initWebGL()">
     <header>
-        <h1>&nbsp;Infographie, Labo 2 - Animation de formes sur courbes de Bézier et éclairage<br></h1>
+        <h1>&nbsp;Infographie, Labo 2 - Éclairage d'objets 3D animés sur une courbe<br></h1>
         <br>&nbsp;&nbsp;Équipe 6 : Chacun Guillaume, Graells Noah, Herbelin Ludovic<br>
         <br>&nbsp;&nbsp;rendu le 04.12.18
     </header>
     <p>
-      Le but du laboratoire était de déplacer des formes sur des courbes de Bézier avec de l'éclairage. <br />
-      Nous avons choisi de placer 4 lumières sur la scène et de laisser l'utilisateur les allumer et éteindre et les déplacer en hauteur. <br />
-
-      Le code est séparé en plusieurs classes de formes, cela nous permet d'avoir un code plus séparé et d'instancier des formes facilement. <br />
-      Nous pourrions également rajouter d'autres types de formes relativement facilement sans toucher à la structure du code lié à WebGL. <br />
-      Nous avons choisi de travailler en mode de dessin "TRIANGLES" avec les mêmes buffers pour toutes les formes, nous pouvons ainsi dessiner toutes les formes d'un coup et profiter de la puissance parallèle des GPU. <br />
-      
+      Le but de ce laboratoire était de déplacer des objets le long d'une courbe dans un univers en trois dimensions. Les éléments sont éclairés le long du chemin par des lumières ponctuelles que l'utilisateur peut allumer, éteindre et déplacer verticalement. <br/>
       <br/>
-      <h2>todo :</h2>
-      - corriger le problème de style des boutons<br/>
-      - corriger le shading de phong<br/>
-      - écrire la "doc" :<br/>
-        - expliquer le problème de lag avec les sphères<br/>
-        - expliquer pourquoi on a fait ces classes (séparation du code, pour dessiner toutes les formes d'un coup et profiter de la parallélisation effectuée par le GPU -> au lieu de dessiner les formes une par une)<br/>
+      <strong>Utiliser Firefox ou un petit serveur local pour contourner le protocole de sécurité de Chrome ("Cross origin requests") causé par l'importation de modèles 3D externes.</strong>
     </p>
-    <canvas id="webgl-canvas" width="800" height="600">
-      HTML5 is not supported
-    </canvas>
     <div id="fps"></div>
+    <canvas id="webgl-canvas" width="800" height="600">HTML5 is not supported</canvas>
 
-    <div id="control-panel">
-      <div class="user-input">
-        <h1>Ajout de formes</h1><br/>
-        <input type="button" value="Ajouter un cube" onclick="addCube(0.4, {r: 1.0, g: 0.0, b: 0.0, a: 0.8})" style="font-size:15px; width: 100px; height: 65px; white-space: normal;"/>
-        <input type="button" value="Ajouter un tétraèdre" onclick="addTetrahedron(0.4, {r: 0.0, g: 1.0, b: 0.0, a: 0.8})" style="font-size:15px; width:100px; height: 65px; white-space: normal;" />
-        <input type="button" value="Ajouter une sphère" onclick="addSphere(0.3, {r: 0.0, g: 1.0, b: 1.0, a: 0.8})" style="font-size:15px; width:100px; height: 65px; white-space: normal;" />
+    <br/>
+    <div id="control-panel" style="display: inline-block;">
+          <h1>Ajout de formes</h1><br/>
+          <button id="btnAddCube" onclick="addCube(0.4, {r: 1.0, g: 0.0, b: 0.0, a: 0.8})" style="font-size:15px; width: 110px; height: 110px; white-space: normal;">
+            Ajouter un cube
+            <div id="btnAddCubeInfo" style="font-size: 11px; color: gray; padding: 0;"> </div>
+          </button>
+          <button id="btnAddTetrahedron" onclick="addTetrahedron(0.6, {r: 0.0, g: 1.0, b: 0.0, a: 0.8})" style="font-size:15px; width:110px; height: 110px; white-space: normal;">
+            Ajouter un tétraèdre
+            <div id="btnAddTetrahedronInfo" style="font-size: 11px; color: gray; padding: 0;"> </div>
+          </button>
+          <button id="btnAddSphere" onclick="addSphere(0.3, {r: 0.0, g: 1.0, b: 1.0, a: 0.8})" style="font-size:15px; width:110px; height: 110px; white-space: normal; padding: 0;">
+            Ajouter une sphère
+            <div id="btnAddSphereInfo" style="font-size: 11px; color: gray; padding: 0;"></div>
+          </button>
 
-        <br/>
-        <br/><h1>Gestion de la lumière</h1><br/>
+          <br/><br/><h1>Gestion de la lumière</h1><br/>
 
-        <div class="light-div">
-          <input type="checkbox" checked onchange="toggleLight(0)" id="toggleLight1" />
-          <span class="title"><label for="toggleLight1">Spot premier plan</label></span> <br>
-          <span class="label">Position en Y : </span><input style="float: right; width:50%" type="range" step="0.1" id="light1Position" onchange="changeLightPos(0, this.value)" oninput="changeLightPos(0, this.value)"/>
-        </div>
+          <div class="light-div">
+            <input type="checkbox" checked onchange="toggleLight(0)" id="toggleLight1" />
+            <span class="title"><label for="toggleLight1">Ampoule premier plan</label></span> <br>
+            <span class="label">Position en Y : </span><input style="float: right; width:50%" type="range" step="0.1" id="light1Position" onchange="changeLightPos(0, this.value)" oninput="changeLightPos(0, this.value)"/>
+            <div class="lightRepresentation-div" id="light1Representation" onclick="document.getElementById('toggleLight1').click()"></div>
+          </div>
 
-        <div class="light-div">
-          <input type="checkbox" checked onchange="toggleLight(1)" id="toggleLight2" />
-          <span class="title"><label for="toggleLight2">Spot de gauche</label></span> <br>
-          <span class="label">Position en Y : </span><input style="float: right; width:50%" type="range" min=minLightHeight.toString() max=maxLightHeight.toString() value=lightPositions[1+1].toString() step="0.1" id="light2Position" onchange="changeLightPos(1, this.value)" oninput="changeLightPos(1, this.value)"/>
-        </div>
+          <div class="light-div">
+            <input type="checkbox" onchange="toggleLight(1)" id="toggleLight2" />
+            <span class="title"><label for="toggleLight2">Ampoule de gauche</label></span> <br>
+            <span class="label">Position en Y : </span><input style="float: right; width:50%" type="range" min=minLightHeight.toString() max=maxLightHeight.toString() value=lightPositions[1+1].toString() step="0.1" id="light2Position" onchange="changeLightPos(1, this.value)" oninput="changeLightPos(1, this.value)"/>
+            <div class="lightRepresentation-div" id="light2Representation" onclick="document.getElementById('toggleLight2').click()"></div>
+          </div>
 
-        <div class="light-div">
-          <input type="checkbox" checked onchange="toggleLight(2)" id="toggleLight3" />
-          <span class="title"><label for="toggleLight3">Spot arrière p</label>lan</span> <br>
-          <span class="label" >Position en Y : </span><input style="float: right; width:50%" type="range" min=minLightHeight.toString() max=maxLightHeight.toString() value=lightPositions[2+1].toString() step="0.1" id="light3Position" onchange="changeLightPos(2, this.value)" oninput="changeLightPos(2, this.value)"/>
-        </div>
+          <div class="light-div">
+            <input type="checkbox" onchange="toggleLight(2)" id="toggleLight3" />
+            <span class="title"><label for="toggleLight3">Ampoule arrière p</label>lan</span> <br>
+            <span class="label" >Position en Y : </span><input style="float: right; width:50%" type="range" min=minLightHeight.toString() max=maxLightHeight.toString() value=lightPositions[2+1].toString() step="0.1" id="light3Position" onchange="changeLightPos(2, this.value)" oninput="changeLightPos(2, this.value)"/>
+            <div class="lightRepresentation-div" id="light3Representation" onclick="document.getElementById('toggleLight3').click()"></div>
+          </div>
 
-        <div class="light-div">
-          <input type="checkbox" checked onchange="toggleLight(3)" id="toggleLight4" />
-          <span class="title"><label for="toggleLight4">Spot de droite</label></span> <br>
-          <span class="label" >Position en Y : </span><input style="float: right; width:50%" type="range" min=minLightHeight.toString() max=maxLightHeight.toString() value=lightPositions[3+1].toString() step="0.1" id="light4Position" onchange="changeLightPos(3, this.value)" oninput="changeLightPos(3, this.value)"/>
-        </div>
+          <div class="light-div">
+            <input type="checkbox" onchange="toggleLight(3)" id="toggleLight4" />
+            <span class="title"><label for="toggleLight4">Ampoule de droite</label></span> <br>
+            <span class="label" >Position en Y : </span><input style="float: right; width:50%" type="range" min=minLightHeight.toString() max=maxLightHeight.toString() value=lightPositions[3+1].toString() step="0.1" id="light4Position" onchange="changeLightPos(3, this.value)" oninput="changeLightPos(3, this.value)"/>
+            <div class="lightRepresentation-div" id="light4Representation" onclick="document.getElementById('toggleLight4').click()"></div>
+          </div>
 
-        <input type="button" value="Inverser l'état de chaque spot" onclick="toggleAllLights()" style="font-size:15px; width: 175px; height: 65px; white-space: normal;" />
-        <input type="button" value="Réinitialiser la position de chaque spot" onclick="resetLightsPosition()" style="font-size:15px; width: 175px; height: 65px; white-space: normal;" />
-        </br>
-
+          <input type="button" value="Inverser l'état de chaque ampoule" onclick="toggleAllLights()" style="font-size:15px; width: 175px; height: 65px; white-space: normal;" />
+          <input type="button" value="Réinitialiser la position de chaque ampoule" onclick="resetLightsPosition()" style="font-size:15px; width: 175px; height: 65px; white-space: normal;" />
       </div>
+    <div  style = "float: left;">
+      <h3>Description détaillée</h3>
+      <p>
+        Nous avons choisi d'implémenter une structure orientée objet pour les modèles géométriques ajoutés à la scène. Nous n'avons cependant pas voulu implémenter une méthode "drawElements" dans chaque objet et de plutôt continuer à utiliser les buffers communs (vertices, colors, etc.) pour profiter de la parallélisation des tâches par le GPU.<br/>
+        <br/>
+        Nous avons implémenté une méthode permettant de définir une courbe de Bézier avec des points de contrôles fournis.<br/>
+        <br/>
+        Nous avons implémenté le modèle d'illumination de Phong adapté à plusieurs lumières ponctuelles.<br/>
+        <br/>
+        Finalement, nous avons implémenté la possibilité d'importer des modèles 3D externes (au format WaveFront : .OBJ). Actuellement, seulement la sphère est chargée de cette manière.<br/>
+        <br/>
+        Cette structure nous permet d'ajouter facilement n'importe quel objet 3D à la scène mais <strong>nécessite d'utiliser Firefox ou de créer un petit serveur local pour contourner le protocole de sécurité "Cross origin requests" de Chrome</strong>.<br/>
+        <br/>
+        <br/>
+        Note à M.Gobron : concernant le problème de frame drop que nous avions, nous avons remarqué que nous appelions la méthode "initBuffers" après la transformation de chaque forme ce qui provoquait de gros ralentissements. Nous avons corrigé le problème en ne l'effectuant qu'une seule fois après avoir update toutes les formes de la scène.
+      </p>
     </div>
   </body>
 </html>
